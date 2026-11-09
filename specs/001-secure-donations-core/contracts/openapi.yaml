@@ -1,0 +1,581 @@
+openapi: 3.1.0
+info:
+  title: Plataforma de Donaciones Seguras API
+  version: 1.0.0
+  description: |
+    Contrato HTTP del núcleo académico: catálogo público, identidad/autorización, donaciones
+    simuladas idempotentes e indicadores agregados. Todos los importes monetarios son enteros en
+    céntimos de PEN (`amountCents`, `goalAmountCents`, `confirmedAmountCents`).
+
+    Seguridad: API Gateway HTTP API con JWT authorizer de Cognito. El backend valida además el grupo
+    (`GESTOR`, `DONANTE`, `AUDITOR`) y el ownership contra el recurso persistido. Nunca se acepta
+    `donorSub`, roles o grupos desde el body, query o cabeceras del cliente.
+
+    Errores: sobre uniforme `{ code, message, requestId }`, sin detalles internos.
+  contact:
+    name: Equipo del laboratorio TAIS
+servers:
+  - url: https://{apiId}.execute-api.{region}.amazonaws.com/{stage}
+    description: API Gateway HTTP API desplegada por SAM
+    variables:
+      apiId:
+        default: api-id
+      region:
+        default: us-east-1
+      stage:
+        default: academic
+tags:
+  - name: Projects
+    description: Catálogo, detalle, indicadores, alta y publicación de proyectos
+  - name: Donations
+    description: Intenciones de donación simuladas, simulación e historial propio
+  - name: Audit
+    description: Endpoint de auditoría diferido (HU-10), no incluido en el MVP
+
+security:
+  - cognitoOAuth: []
+
+x-deferred:
+  - GET /v1/audit (HU-10, extensión)
+  - Autorización externalizada con Cedar/Verified Permissions (HU-12, extensión)
+
+paths:
+  /v1/projects:
+    get:
+      tags: [Projects]
+      operationId: listProjects
+      summary: Listar proyectos PUBLICADO
+      description: Devuelve solo proyectos PUBLICADO, ordenados por fecha de creación descendente.
+      security: []
+      responses:
+        "200":
+          description: Catálogo público
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectList"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      tags: [Projects]
+      operationId: createProject
+      summary: Crear un proyecto en BORRADOR
+      description: Solo GESTOR. El proyecto nace en BORRADOR y no es visible públicamente.
+      security:
+        - cognitoOAuth: [api/projects.write]
+      x-required-group: GESTOR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectCreateRequest"
+      responses:
+        "201":
+          description: Proyecto creado en BORRADOR
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/projects/{projectId}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      tags: [Projects]
+      operationId: getProject
+      summary: Consultar el detalle de un proyecto publicado
+      description: Un proyecto inexistente o no publicado responde 404 sin revelar contenido.
+      security: []
+      responses:
+        "200":
+          description: Detalle del proyecto
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/projects/{projectId}/stats:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      tags: [Projects]
+      operationId: getProjectStats
+      summary: Consultar indicadores agregados públicos
+      description: |
+        Devuelve solo montos agregados en céntimos PEN. No expone identificadores de donantes ni
+        registros individuales. La suma confirmada excluye donaciones pendientes y rechazadas.
+      security: []
+      responses:
+        "200":
+          description: Indicadores agregados
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectStats"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/projects/{projectId}/publish:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    patch:
+      tags: [Projects]
+      operationId: publishProject
+      summary: Publicar un proyecto en BORRADOR
+      description: Solo GESTOR. Un proyecto ya publicado responde 409.
+      security:
+        - cognitoOAuth: [api/projects.write]
+      x-required-group: GESTOR
+      responses:
+        "200":
+          description: Proyecto publicado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/donations:
+    post:
+      tags: [Donations]
+      operationId: createDonation
+      summary: Registrar una intención de donación simulada
+      description: |
+        Solo DONANTE. `donorSub` se toma del token verificado. Requiere `Idempotency-Key` UUID.
+        La huella de idempotencia se calcula sobre el JSON completo canónico del body; cualquier
+        diferencia, incluidos campos extra, cuenta como carga distinta.
+      security:
+        - cognitoOAuth: [api/donations.write]
+      x-required-group: DONANTE
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DonationCreateRequest"
+      responses:
+        "201":
+          description: Donación creada en PENDIENTE_SIMULACION
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Donation"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/donations/me:
+    get:
+      tags: [Donations]
+      operationId: listMyDonations
+      summary: Consultar el historial propio
+      description: Devuelve solo las donaciones del `sub` autenticado, ordenadas por fecha descendente.
+      security:
+        - cognitoOAuth: [api/donations.read]
+      x-required-group: DONANTE
+      responses:
+        "200":
+          description: Historial del donante
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DonationList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/donations/{donationId}:
+    parameters:
+      - $ref: "#/components/parameters/DonationId"
+    get:
+      tags: [Donations]
+      operationId: getDonation
+      summary: Consultar una donación propia
+      description: |
+        Solo el donante propietario. Un acceso a una donación ajena responde 404 para no revelar
+        su existencia (prueba BOLA/T09).
+      security:
+        - cognitoOAuth: [api/donations.read]
+      x-required-group: DONANTE
+      responses:
+        "200":
+          description: Donación propia
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Donation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/donations/{donationId}/simulate:
+    parameters:
+      - $ref: "#/components/parameters/DonationId"
+    post:
+      tags: [Donations]
+      operationId: simulateDonation
+      summary: Simular la confirmación o el rechazo de una donación propia
+      description: |
+        Solo DONANTE propietario y solo en el stage `academic`; en otros stages la ruta no existe.
+        Solo la primera transición válida modifica el agregado confirmado. Repeticiones y carreras
+        responden 409.
+      security:
+        - cognitoOAuth: [api/donations.write]
+      x-required-group: DONANTE
+      x-stage-availability: academic
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DonationSimulateRequest"
+      responses:
+        "200":
+          description: Donación actualizada a estado terminal simulado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Donation"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  securitySchemes:
+    cognitoOAuth:
+      type: oauth2
+      description: |
+        Authorization Code + PKCE contra Cognito. El JWT authorizer de API Gateway valida firma,
+        emisor, expiración, `client_id`, `token_use=access` y scopes. Los ID tokens no se aceptan
+        como credencial de API. Los grupos se validan en el backend. Reemplazar `cognito-domain`
+        por el dominio real del User Pool al desplegar.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://cognito-domain.auth.us-east-1.amazoncognito.com/oauth2/authorize
+          tokenUrl: https://cognito-domain.auth.us-east-1.amazoncognito.com/oauth2/token
+          refreshUrl: https://cognito-domain.auth.us-east-1.amazoncognito.com/oauth2/token
+          scopes:
+            api/projects.write: Crear y publicar proyectos (GESTOR)
+            api/donations.write: Crear donaciones y simular confirmación/rechazo (DONANTE)
+            api/donations.read: Consultar el historial y las donaciones propias (DONANTE)
+            api/audit.read: Consultar auditoría (AUDITOR; HU-10 diferido)
+
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      description: Identificador UUID del proyecto
+      schema:
+        type: string
+        format: uuid
+    DonationId:
+      name: donationId
+      in: path
+      required: true
+      description: Identificador UUID de la donación
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: UUID de idempotencia de la creación de donación
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Datos de entrada inválidos
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Falta un access token válido o el token no es aceptable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: El usuario autenticado no tiene el rol o ownership requerido
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Recurso inexistente o no visible para el solicitante
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Conflicto de estado, proyecto no publicado o clave de idempotencia reutilizada
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InternalError:
+      description: Error interno sin detalles sensibles
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message, requestId]
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          description: Código estable y no sensible
+          examples: [INVALID_AMOUNT, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, INTERNAL_ERROR]
+        message:
+          type: string
+          description: Mensaje apto para el usuario, sin detalles internos
+        requestId:
+          type: string
+          description: Identificador de correlación de la solicitud
+
+    Currency:
+      type: string
+      enum: [PEN]
+
+    ProjectStatus:
+      type: string
+      enum: [BORRADOR, PUBLICADO]
+
+    DonationStatus:
+      type: string
+      enum: [PENDIENTE_SIMULACION, CONFIRMADA_SIMULADA, RECHAZADA_SIMULADA]
+
+    ProjectSummary:
+      type: object
+      required: [projectId, title, description, goalAmountCents, confirmedAmountCents, currency]
+      additionalProperties: false
+      properties:
+        projectId:
+          type: string
+          format: uuid
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        goalAmountCents:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Meta en céntimos enteros de PEN
+        confirmedAmountCents:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Suma confirmada simulada en céntimos enteros de PEN
+        currency:
+          $ref: "#/components/schemas/Currency"
+
+    Project:
+      type: object
+      required:
+        - projectId
+        - title
+        - description
+        - goalAmountCents
+        - confirmedAmountCents
+        - currency
+        - status
+        - createdAt
+        - updatedAt
+      additionalProperties: false
+      properties:
+        projectId:
+          type: string
+          format: uuid
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        goalAmountCents:
+          type: integer
+          format: int64
+          minimum: 1
+        confirmedAmountCents:
+          type: integer
+          format: int64
+          minimum: 0
+        currency:
+          $ref: "#/components/schemas/Currency"
+        status:
+          $ref: "#/components/schemas/ProjectStatus"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ProjectList:
+      type: array
+      items:
+        $ref: "#/components/schemas/ProjectSummary"
+
+    ProjectCreateRequest:
+      type: object
+      required: [title, description, goalAmountCents]
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        goalAmountCents:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Objetivo positivo en céntimos enteros de PEN
+
+    ProjectStats:
+      type: object
+      required: [projectId, goalAmountCents, confirmedAmountCents, currency]
+      additionalProperties: false
+      properties:
+        projectId:
+          type: string
+          format: uuid
+        goalAmountCents:
+          type: integer
+          format: int64
+          minimum: 1
+        confirmedAmountCents:
+          type: integer
+          format: int64
+          minimum: 0
+        currency:
+          $ref: "#/components/schemas/Currency"
+
+    Donation:
+      type: object
+      required: [donationId, projectId, amountCents, currency, status, createdAt, updatedAt]
+      additionalProperties: false
+      properties:
+        donationId:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        amountCents:
+          type: integer
+          format: int64
+          minimum: 100
+          maximum: 100000
+          description: Importe entero en céntimos de PEN (S/ 1.00 a S/ 1,000.00)
+        currency:
+          $ref: "#/components/schemas/Currency"
+        status:
+          $ref: "#/components/schemas/DonationStatus"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    DonationList:
+      type: array
+      items:
+        $ref: "#/components/schemas/Donation"
+
+    DonationCreateRequest:
+      type: object
+      required: [projectId, amountCents]
+      additionalProperties: true
+      description: |
+        `donorSub` no se acepta: se deriva del token. Los campos adicionales se incluyen en la huella
+        de idempotencia (JSON completo canónico) pero no alteran la identidad ni la autorización.
+      properties:
+        projectId:
+          type: string
+          format: uuid
+        amountCents:
+          type: integer
+          format: int64
+          minimum: 100
+          maximum: 100000
+          description: Importe entero en céntimos de PEN; se rechazan flotantes y valores fuera de rango
+
+    DonationSimulateRequest:
+      type: object
+      required: [outcome]
+      additionalProperties: false
+      properties:
+        outcome:
+          type: string
+          enum: [CONFIRMADA_SIMULADA, RECHAZADA_SIMULADA]
+          description: Resultado simulado de la donación
