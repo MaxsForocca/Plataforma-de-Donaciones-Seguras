@@ -1,0 +1,19 @@
+{
+  "projects": [
+    {
+      "projectId": "00000000-0000-4000-8000-000000000001",
+      "title": "Biblioteca comunitaria (proyecto de ejemplo)",
+      "description": "Proyecto ficticio PUBLICADO para pruebas y demo del catálogo.",
+      "goalAmountCents": 500000,
+      "status": "PUBLICADO"
+    },
+    {
+      "projectId": "00000000-0000-4000-8000-000000000002",
+      "title": "Huerto escolar (proyecto de ejemplo)",
+      "description": "Proyecto ficticio en BORRADOR; no debe aparecer en el catálogo público.",
+      "goalAmountCents": 250000,
+      "status": "BORRADOR"
+    }
+  ],
+  "donations": []
+}

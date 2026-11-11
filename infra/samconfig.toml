@@ -1,0 +1,42 @@
+# Configuración de despliegue SAM. No contiene credenciales ni perfiles de AWS.
+# No existe entorno "default": hay que elegir stage de forma explícita, por ejemplo:
+#   sam deploy --config-env academic
+# El despliegue lo ejecuta una persona del equipo con sus propias credenciales (nunca un asistente).
+version = 0.1
+
+[academic.global.parameters]
+stack_name = "secure-donations-academic"
+
+[academic.build.parameters]
+cached = true
+parallel = true
+
+[academic.validate.parameters]
+lint = true
+
+[academic.deploy.parameters]
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+resolve_s3 = true
+fail_on_empty_changeset = false
+parameter_overrides = "Stage=academic"
+
+# Stage no académico: la ruta de simulación no se crea (FR-017).
+[dev.global.parameters]
+stack_name = "secure-donations-dev"
+
+[dev.build.parameters]
+cached = true
+parallel = true
+
+[dev.validate.parameters]
+lint = true
+
+[dev.deploy.parameters]
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+resolve_s3 = true
+fail_on_empty_changeset = false
+parameter_overrides = "Stage=dev"

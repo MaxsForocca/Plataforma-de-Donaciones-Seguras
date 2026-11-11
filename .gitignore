@@ -1,0 +1,27 @@
+# Dependencias y artefactos de build
+node_modules/
+dist/
+build/
+coverage/
+.aws-sam/
+*.tsbuildinfo
+*.log
+npm-debug.log*
+
+# Secretos y entorno local (nunca versionar; solo .env.example)
+.env
+.env.*
+!.env.example
+
+# Credenciales y estado local de AWS
+.aws/
+*.pem
+*.key
+
+# Sistema operativo e IDE
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.idea/
+.vscode/

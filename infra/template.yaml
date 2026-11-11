@@ -1,0 +1,46 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Plataforma de Donaciones Seguras (proyecto académico, donaciones simuladas).
+  Esqueleto SAM: parámetro Stage, convención de nombres y outputs. Las tablas DynamoDB, Cognito,
+  API Gateway, funciones Lambda e IAM se añaden en T023-T027 (Fase 2).
+
+Parameters:
+  Stage:
+    Type: String
+    Default: academic
+    AllowedValues:
+      - academic
+      - dev
+    Description: >
+      Entorno de despliegue. La ruta de simulación de donaciones existe únicamente en `academic`
+      (FR-017); en cualquier otro stage no debe crearse.
+
+Conditions:
+  IsAcademicStage: !Equals [!Ref Stage, academic]
+
+Globals:
+  Function:
+    Runtime: nodejs24.x
+    Architectures:
+      - arm64
+    Timeout: 10
+    MemorySize: 256
+    Environment:
+      Variables:
+        STAGE: !Ref Stage
+
+# Convención de nombres de recursos: secure-donations-<Stage>-<recurso>
+# (se aplica con !Sub "secure-donations-${Stage}-<recurso>" en T023-T026).
+Resources: {}
+
+Outputs:
+  Stage:
+    Description: Stage desplegado
+    Value: !Ref Stage
+  ResourcePrefix:
+    Description: Prefijo de nombres de recursos para este stage
+    Value: !Sub "secure-donations-${Stage}"
+  SimulationRouteEnabled:
+    Description: Indica si la ruta de simulación académica existe en este stage
+    Value: !If [IsAcademicStage, "true", "false"]

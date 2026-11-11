@@ -1,0 +1,14 @@
+node_modules/
+dist/
+dist-types/
+build/
+coverage/
+.aws-sam/
+package-lock.json
+.claude/
+.opencode/
+.specify/
+_to_delete/
+specs/
+design.md
+requirements.md

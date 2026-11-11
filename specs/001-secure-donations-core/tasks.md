@@ -35,18 +35,18 @@ independientes. Los identificadores CA se conservan literalmente.
 
 **Purpose**: Inicializar el monorepo, tooling, SAM y estructura base.
 
-- [ ] T001 Create root npm workspaces configuration and shared TypeScript base in `package.json`, `package-lock.json`, `tsconfig.base.json` and `.gitignore`
-- [ ] T002 [P] Initialize frontend workspace with React 19.3, Vite 8.3, Tailwind CSS 4, React Router 8, React Hook Form 7, Zod 4, TanStack Query 5, oidc-client-ts, Vitest 5 and Testing Library in `frontend/package.json`
-- [ ] T003 [P] Initialize backend workspace with TypeScript, AWS SDK v3 DynamoDB clients, Zod 4, Vitest 5 and Node 24 types in `backend/package.json`
-- [ ] T004 [P] Initialize `packages/shared/package.json` with exports for Zod schemas, domain types and the error envelope
-- [ ] T005 Create source directory skeleton for `frontend/src/{pages,components,auth,services}`, `backend/src/{projects,donations,authz,audit,shared}`, `backend/test/{unit,integration,contract}`, `packages/shared/src`, `infra/`, `scripts/`, `docs/` and `evidence/`
-- [ ] T006 [P] Configure ESLint 10, Prettier 3 and TypeScript project references in `eslint.config.js`, `.prettierrc` and workspace `tsconfig.json` files
-- [ ] T007 [P] Create CI workflow with lint, typecheck, unit/integration/contract tests, build and `npm audit` in `.github/workflows/ci.yml`
-- [ ] T008 [P] Create dependency guard that fails when `bootstrap` or `next` appear in manifests, lockfile or imports in `scripts/check-deps.mjs`
-- [ ] T009 Create SAM skeleton with `Stage` parameter, stack outputs and environment naming in `infra/template.yaml`
-- [ ] T010 [P] Create SAM deployment configuration for `academic` and non-academic stages in `infra/samconfig.toml`
-- [ ] T011 [P] Create `.env.example` and initial deploy/limitations README without secrets in `.env.example` and `README.md`
-- [ ] T012 [P] Create seed script entry point and fixture format for published/draft projects in `scripts/seed.ts`
+- [X] T001 Create root npm workspaces configuration and shared TypeScript base in `package.json`, `package-lock.json`, `tsconfig.base.json` and `.gitignore`
+- [X] T002 [P] Initialize frontend workspace with React 19.3, Vite 8.3, Tailwind CSS 4, React Router 8, React Hook Form 7, Zod 4, TanStack Query 5, oidc-client-ts, Vitest 5 and Testing Library in `frontend/package.json`
+- [X] T003 [P] Initialize backend workspace with TypeScript, AWS SDK v3 DynamoDB clients, Zod 4, Vitest 5 and Node 24 types in `backend/package.json`
+- [X] T004 [P] Initialize `packages/shared/package.json` with exports for Zod schemas, domain types and the error envelope
+- [X] T005 Create source directory skeleton for `frontend/src/{pages,components,auth,services}`, `backend/src/{projects,donations,authz,audit,shared}`, `backend/test/{unit,integration,contract}`, `packages/shared/src`, `infra/`, `scripts/`, `docs/` and `evidence/`
+- [X] T006 [P] Configure ESLint 10, Prettier 3 and TypeScript project references in `eslint.config.js`, `.prettierrc` and workspace `tsconfig.json` files
+- [X] T007 [P] Create CI workflow with lint, typecheck, unit/integration/contract tests, build and `npm audit` in `.github/workflows/ci.yml`
+- [X] T008 [P] Create dependency guard that fails when `bootstrap` or `next` appear in manifests, lockfile or imports in `scripts/check-deps.mjs`
+- [X] T009 Create SAM skeleton with `Stage` parameter, stack outputs and environment naming in `infra/template.yaml`
+- [X] T010 [P] Create SAM deployment configuration for `academic` and non-academic stages in `infra/samconfig.toml`
+- [X] T011 [P] Create `.env.example` and initial deploy/limitations README without secrets in `.env.example` and `README.md`
+- [X] T012 [P] Create seed script entry point and fixture format for published/draft projects in `scripts/seed.ts`
 
 ---
 
