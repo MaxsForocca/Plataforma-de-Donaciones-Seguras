@@ -21,11 +21,11 @@ import {
   buildJwtEvent,
   createLocalClients,
   hasLocalDynamo,
+  isolatedConfig,
   resetTables,
-  testConfig,
 } from "../helpers/setup";
 
-const config = testConfig();
+const config = isolatedConfig("catalog");
 const EXTRA = [
   makeProject({
     projectId: "00000000-0000-4000-8000-000000000010",
@@ -110,7 +110,9 @@ describe.skipIf(!hasLocalDynamo())("DynamoDB Local: catálogo público sembrado"
     ["borrador", DRAFT_PROJECT_ID],
     ["inexistente", MISSING_PROJECT_ID],
   ])("las estadísticas de un proyecto %s responden 404", async (_label, projectId) => {
-    const response = await stats(buildJwtEvent({ authorizer: false, pathParameters: { projectId } }));
+    const response = await stats(
+      buildJwtEvent({ authorizer: false, pathParameters: { projectId } }),
+    );
     expect(response.statusCode).toBe(404);
   });
 
@@ -121,9 +123,7 @@ describe.skipIf(!hasLocalDynamo())("DynamoDB Local: catálogo público sembrado"
 
   it("con la tabla sin proyectos publicados el listado es []", async () => {
     await resetTables(raw, config);
-    await doc.send(
-      new PutCommand({ TableName: config.tables.projects, Item: ALL_PROJECTS[1]! }),
-    );
+    await doc.send(new PutCommand({ TableName: config.tables.projects, Item: ALL_PROJECTS[1]! }));
     const response = await list(buildJwtEvent({ authorizer: false }));
     expect(response.statusCode).toBe(200);
     expect(response.body).toBe("[]");

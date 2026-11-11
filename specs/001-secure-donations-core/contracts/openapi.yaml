@@ -45,7 +45,9 @@ paths:
       tags: [Projects]
       operationId: listProjects
       summary: Listar proyectos PUBLICADO
-      description: Devuelve solo proyectos PUBLICADO, ordenados por fecha de creación descendente.
+      description: |
+        Devuelve solo proyectos PUBLICADO, ordenados por fecha de creación descendente. El catálogo no
+        se pagina: cualquier parámetro de consulta (p. ej. `limit`, `cursor`, `page`) se rechaza con 400.
       security: []
       responses:
         "200":
@@ -54,6 +56,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProjectList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "500":
           $ref: "#/components/responses/InternalError"
     post:
@@ -217,6 +221,8 @@ paths:
                 $ref: "#/components/schemas/DonationList"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalError"
 

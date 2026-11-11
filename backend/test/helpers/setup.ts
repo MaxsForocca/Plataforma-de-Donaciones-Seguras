@@ -43,6 +43,19 @@ export function testConfig(overrides: Record<string, string | undefined> = {}): 
   return loadConfig(testEnv(overrides));
 }
 
+/**
+ * Configuración con tablas propias por archivo de prueba: los archivos de integración se ejecutan en
+ * paralelo y cada uno recrea sus tablas, por lo que no pueden compartir nombres.
+ */
+export function isolatedConfig(prefix: string): AppConfig {
+  return testConfig({
+    PROJECTS_TABLE: `${prefix}Projects`,
+    DONATIONS_TABLE: `${prefix}Donations`,
+    IDEMPOTENCY_TABLE: `${prefix}Idempotency`,
+    AUDIT_TABLE: `${prefix}AuditEvents`,
+  });
+}
+
 // --- Contexto del authorizer ------------------------------------------------------------------
 
 export interface JwtEventOptions {

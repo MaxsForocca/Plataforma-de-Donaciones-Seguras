@@ -23,7 +23,7 @@ import { buildJwtEvent, createRecordingClient } from "../../helpers/setup";
 
 const TABLE = "testProjects";
 
-function setup(items: readonly Record<string, unknown>[] = [PUBLISHED_PROJECT, DRAFT_PROJECT]) {
+function setup(items: readonly object[] = [PUBLISHED_PROJECT, DRAFT_PROJECT]) {
   const client = createFakeProjectsDynamo(items);
   const repository = createProjectsRepository(client, TABLE);
   const lines: string[] = [];
@@ -70,7 +70,9 @@ describe("suma confirmada (CA-09.1)", () => {
 
   it("un proyecto sin donaciones confirmadas muestra 0", async () => {
     const { call } = setup([makeProject({ confirmedAmountCents: 0 })]);
-    expect(JSON.parse((await call(PUBLISHED_PROJECT_ID)).body as string).confirmedAmountCents).toBe(0);
+    expect(JSON.parse((await call(PUBLISHED_PROJECT_ID)).body as string).confirmedAmountCents).toBe(
+      0,
+    );
   });
 
   it("lee únicamente la tabla Projects con GetItem: no puede sumar pendientes ni rechazadas", async () => {
@@ -93,7 +95,10 @@ describe("suma confirmada (CA-09.1)", () => {
 
   it("conserva importes grandes exactos (sin float)", async () => {
     const { call } = setup([
-      makeProject({ goalAmountCents: Number.MAX_SAFE_INTEGER, confirmedAmountCents: Number.MAX_SAFE_INTEGER - 1 }),
+      makeProject({
+        goalAmountCents: Number.MAX_SAFE_INTEGER,
+        confirmedAmountCents: Number.MAX_SAFE_INTEGER - 1,
+      }),
     ]);
     const body = JSON.parse((await call(PUBLISHED_PROJECT_ID)).body as string);
     expect(body.goalAmountCents).toBe(Number.MAX_SAFE_INTEGER);
@@ -185,10 +190,14 @@ describe("404 uniforme: inexistente, no publicado o malformado (CA-02.2)", () =>
     const { call } = setup();
     const event = buildJwtEvent({ authorizer: false });
     delete (event as { pathParameters?: unknown }).pathParameters;
-    expect((await createGetProjectStatsHandler({
-      repository: createProjectsRepository(createFakeProjectsDynamo([]), TABLE),
-      createLogger: (id) => createLogger(id, { sink: () => {} }),
-    })(event)).statusCode).toBe(404);
+    expect(
+      (
+        await createGetProjectStatsHandler({
+          repository: createProjectsRepository(createFakeProjectsDynamo([]), TABLE),
+          createLogger: (id) => createLogger(id, { sink: () => {} }),
+        })(event)
+      ).statusCode,
+    ).toBe(404);
     expect((await call(undefined)).statusCode).toBe(404);
   });
 
@@ -234,7 +243,9 @@ describe("integridad y fallos", () => {
   ])("datos corruptos (%s) → 500 controlado, nunca un valor inventado", async (_label, patch) => {
     const client = createRecordingClient(() => ({ Item: { ...PUBLISHED_PROJECT, ...patch } }));
     const repository = createProjectsRepository(client, TABLE);
-    const error = await repository.getStats(PUBLISHED_PROJECT_ID).catch((caught: unknown) => caught);
+    const error = await repository
+      .getStats(PUBLISHED_PROJECT_ID)
+      .catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(AppError);
     expect((error as AppError).statusCode).toBe(500);
   });
@@ -244,7 +255,9 @@ describe("integridad y fallos", () => {
       repository: {
         getStats: vi
           .fn()
-          .mockRejectedValue(new Error("arn:aws:dynamodb:us-east-1:123456789012:table/prod-Projects")),
+          .mockRejectedValue(
+            new Error("arn:aws:dynamodb:us-east-1:123456789012:table/prod-Projects"),
+          ),
       },
       createLogger: (id) => createLogger(id, { sink: () => {} }),
     });
@@ -258,7 +271,9 @@ describe("integridad y fallos", () => {
   it("es público: ignora la cabecera Authorization y no exige contexto de authorizer", async () => {
     const { call } = setup();
     const plain = await call(PUBLISHED_PROJECT_ID);
-    const withHeader = await call(PUBLISHED_PROJECT_ID, { headers: { authorization: "Bearer falso" } });
+    const withHeader = await call(PUBLISHED_PROJECT_ID, {
+      headers: { authorization: "Bearer falso" },
+    });
     expect(plain.statusCode).toBe(200);
     expect(withHeader.body).toBe(plain.body);
   });
@@ -269,7 +284,11 @@ describe("integridad y fallos", () => {
     await call(MISSING_PROJECT_ID);
     const [ok, notFound] = lines.map((l) => JSON.parse(l));
     expect(ok).toMatchObject({ action: "getProjectStats", result: "success", statusCode: 200 });
-    expect(notFound).toMatchObject({ action: "getProjectStats", result: "denied", statusCode: 404 });
+    expect(notFound).toMatchObject({
+      action: "getProjectStats",
+      result: "denied",
+      statusCode: 404,
+    });
     expect(lines.join("\n")).not.toMatch(/SECRETO|Biblioteca/);
   });
 });

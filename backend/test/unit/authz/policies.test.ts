@@ -228,3 +228,85 @@ describe("authorizeOwned", () => {
     expect(statusOf(() => authorizeOwned(donante, "donation:simulate", undefined))).toBe(404);
   });
 });
+
+describe("T051 (extensión): scopes manipulados y tipos confusos", () => {
+  it.each([
+    ["con espacio final", "api/donations.write "],
+    ["en mayúsculas", "API/DONATIONS.WRITE"],
+    ["con sufijo", "api/donations.writeX"],
+    ["con prefijo", "xapi/donations.write"],
+    ["con comodín", "api/donations.*"],
+    ["comodín global", "*"],
+    ["solo el recurso", "api/donations"],
+    ["sin prefijo api/", "donations.write"],
+    ["con ruta relativa", "api/../donations.write"],
+  ])("el scope %s no autoriza crear donaciones", (_label, scope) => {
+    const p = principalOf(donanteEvent({ scopes: [scope] }));
+    expect(can(p, "donation:create")).toBe(false);
+  });
+
+  it("dos scopes pegados en un solo elemento no autorizan ninguno", () => {
+    const p = principalOf(donanteEvent({ scopes: ["api/donations.read api/donations.write"] }));
+    expect(can(p, "donation:create")).toBe(false);
+    expect(can(p, "donation:list-own")).toBe(false);
+  });
+
+  it("el rol correcto sin scope, y el scope correcto sin rol, son 403 en cada acción", () => {
+    for (const action of ALL_ACTIONS) {
+      const { roles, scope } = ACTIONS[action];
+      const rolSinScope = principalOf(buildJwtEvent({ groups: [...roles], scopes: [] }));
+      const scopeSinRol = principalOf(buildJwtEvent({ groups: ["ADMIN"], scopes: [scope] }));
+      expect(statusOf(() => authorize(rolSinScope, action))).toBe(403);
+      expect(statusOf(() => authorize(scopeSinRol, action))).toBe(403);
+    }
+  });
+
+  it("la tabla de acciones es inmutable: no se pueden añadir roles ni scopes en tiempo de ejecución", () => {
+    expect(() => (ACTIONS["project:create"].roles as unknown as string[]).push("DONANTE")).toThrow(
+      TypeError,
+    );
+    expect(() => {
+      (ACTIONS["project:create"] as { scope: string }).scope = "*";
+    }).toThrow(TypeError);
+    expect(() => {
+      (ACTIONS as Record<string, unknown>)["project:delete"] = { roles: ["DONANTE"], scope: "x" };
+    }).toThrow(TypeError);
+    expect(can(donante, "project:create")).toBe(false);
+  });
+
+  describe("confusión de tipos en la propiedad (ownership)", () => {
+    it.each([
+      ["objeto con toString igual al sub", { toString: () => DONOR_A_SUB }],
+      ["arreglo con el sub", [DONOR_A_SUB]],
+      ["número", 123],
+      ["booleano true", true],
+      ["String envolvente", new String(DONOR_A_SUB)],
+    ])("donorSub como %s → 404", (_label, donorSub) => {
+      expect(statusOf(() => assertOwner(donante, { donorSub }))).toBe(404);
+    });
+
+    it("un recurso que es una cadena o un arreglo (no un objeto con donorSub) → 404", () => {
+      expect(statusOf(() => assertOwner(donante, DONOR_A_SUB as never))).toBe(404);
+      expect(statusOf(() => assertOwner(donante, [{ donorSub: DONOR_A_SUB }] as never))).toBe(404);
+    });
+  });
+
+  it("CA-04.2: un GESTOR (aunque su sub coincida con el del recurso) no accede al historial ni a donaciones", () => {
+    const gestorMismoSub = principalOf(
+      gestorEvent({ sub: DONOR_A_SUB, scopes: ["api/donations.read", "api/projects.write"] }),
+    );
+    expect(
+      statusOf(() =>
+        authorizeOwned(gestorMismoSub, "donation:read-own", { donorSub: DONOR_A_SUB }),
+      ),
+    ).toBe(403);
+    expect(statusOf(() => authorize(gestorMismoSub, "donation:list-own"))).toBe(403);
+  });
+
+  it("un AUDITOR tampoco accede al historial de un donante", () => {
+    const auditorConScopes = principalOf(
+      auditorEvent({ scopes: ["api/audit.read", "api/donations.read"] }),
+    );
+    expect(statusOf(() => authorize(auditorConScopes, "donation:list-own"))).toBe(403);
+  });
+});

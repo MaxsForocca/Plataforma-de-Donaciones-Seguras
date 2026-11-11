@@ -14,7 +14,7 @@ export interface ActionPolicy {
   readonly scope: string;
 }
 
-export const ACTIONS = {
+const ACTION_TABLE = {
   "project:create": { roles: ["GESTOR"], scope: "api/projects.write" },
   "project:publish": { roles: ["GESTOR"], scope: "api/projects.write" },
   "donation:create": { roles: ["DONANTE"], scope: "api/donations.write" },
@@ -24,7 +24,18 @@ export const ACTIONS = {
   "audit:read": { roles: ["AUDITOR"], scope: "api/audit.read" },
 } as const satisfies Record<string, ActionPolicy>;
 
-export type Action = keyof typeof ACTIONS;
+function deepFreeze<T>(value: T): T {
+  if (typeof value === "object" && value !== null && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const inner of Object.values(value)) deepFreeze(inner);
+  }
+  return value;
+}
+
+/** Inmutable en tiempo de ejecución: nada puede añadir roles ni scopes a una acción. */
+export const ACTIONS = deepFreeze(ACTION_TABLE);
+
+export type Action = keyof typeof ACTION_TABLE;
 
 function policyFor(action: string): ActionPolicy | undefined {
   return Object.hasOwn(ACTIONS, action) ? ACTIONS[action as Action] : undefined;

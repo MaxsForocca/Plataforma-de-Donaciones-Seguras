@@ -95,19 +95,19 @@ pendientes/rechazadas y que no se exponen donantes ni donaciones individuales.
 
 ### Tests for User Story 1
 
-- [ ] T034 [P] [US1] Unit test catalog mapping and only-PUBLICADO filtering in `backend/test/unit/projects/list.test.ts`
-- [ ] T035 [P] [US1] Unit test confirmed-sum excludes PENDIENTE_SIMULACION and RECHAZADA_SIMULADA in `backend/test/unit/projects/stats.test.ts`
-- [ ] T036 [P] [US1] Contract test `GET /v1/projects` returns 200 with only published summaries and no donor identifiers in `backend/test/contract/projects.list.test.ts`
-- [ ] T037 [P] [US1] Contract test `GET /v1/projects/{projectId}/stats` returns 200/404 with PEN aggregate fields and no donor records in `backend/test/contract/projects.stats.test.ts`
-- [ ] T038 [P] [US1] Integration test seeded catalog returns published projects and excludes drafts in `backend/test/integration/projects.catalog.test.ts`
-- [ ] T039 [P] [US1] Frontend test CatalogPage loading, empty, error and aggregate display in `frontend/test/CatalogPage.test.tsx`
+- [X] T034 [P] [US1] Unit test catalog mapping and only-PUBLICADO filtering in `backend/test/unit/projects/list.test.ts`
+- [X] T035 [P] [US1] Unit test confirmed-sum excludes PENDIENTE_SIMULACION and RECHAZADA_SIMULADA in `backend/test/unit/projects/stats.test.ts`
+- [X] T036 [P] [US1] Contract test `GET /v1/projects` returns 200 with only published summaries and no donor identifiers in `backend/test/contract/projects.list.test.ts`
+- [X] T037 [P] [US1] Contract test `GET /v1/projects/{projectId}/stats` returns 200/404 with PEN aggregate fields and no donor records in `backend/test/contract/projects.stats.test.ts`
+- [X] T038 [P] [US1] Integration test seeded catalog returns published projects and excludes drafts in `backend/test/integration/projects.catalog.test.ts`
+- [X] T039 [P] [US1] Frontend test CatalogPage loading, empty, error and aggregate display in `frontend/test/CatalogPage.test.tsx`
 
 ### Implementation for User Story 1
 
-- [ ] T040 [US1] Implement project read repository for `listPublished`, `getProject` and aggregate reads in `backend/src/projects/repository.ts`
-- [ ] T041 [US1] Implement `listProjects` and `getProjectStats` handlers in `backend/src/projects/handlers/listProjects.ts` and `backend/src/projects/handlers/getProjectStats.ts`
-- [ ] T042 [US1] Wire catalog and stats routes with read-only IAM permissions in `infra/template.yaml`
-- [ ] T043 [US1] Implement CatalogPage with TanStack Query, loading/empty/error states and PEN formatting in `frontend/src/pages/CatalogPage.tsx`
+- [X] T040 [US1] Implement project read repository for `listPublished`, `getProject` and aggregate reads in `backend/src/projects/repository.ts`
+- [X] T041 [US1] Implement `listProjects` and `getProjectStats` handlers in `backend/src/projects/handlers/listProjects.ts` and `backend/src/projects/handlers/getProjectStats.ts`
+- [X] T042 [US1] Wire catalog and stats routes with read-only IAM permissions in `infra/template.yaml`
+- [X] T043 [US1] Implement CatalogPage with TanStack Query, loading/empty/error states and PEN formatting in `frontend/src/pages/CatalogPage.tsx`
 
 **Checkpoint**: US1 funcional y verificable independientemente con datos semilla.
 
@@ -123,15 +123,15 @@ cerrar sesión y verificar que el access token deja de estar disponible y que el
 
 ### Tests for User Story 3
 
-- [ ] T044 [P] [US3] Integration test rejects missing, expired, tampered, foreign-client and ID tokens with 401 in `backend/test/integration/auth.tokens.test.ts`
-- [ ] T045 [P] [US3] Frontend test verifies tokens stay in memory, logout clears them and refresh revocation is invoked in `frontend/test/auth.test.tsx`
+- [X] T044 [P] [US3] Integration test rejects missing, expired, tampered, foreign-client and ID tokens with 401 in `backend/test/integration/auth.tokens.test.ts`
+- [X] T045 [P] [US3] Frontend test verifies tokens stay in memory, logout clears them and refresh revocation is invoked in `frontend/test/auth.test.tsx`
 
 ### Implementation for User Story 3
 
-- [ ] T046 [US3] Configure JWT authorizer route scopes and access token validity 5–15 min in `infra/template.yaml`
-- [ ] T047 [US3] Complete PKCE login/callback/logout flow in `frontend/src/auth/AuthProvider.tsx` and `frontend/src/pages/LoginCallbackPage.tsx`
-- [ ] T048 [US3] Implement UX-only protected route guard in `frontend/src/auth/ProtectedRoute.tsx`
-- [ ] T049 [US3] Document the access-token revocation limitation and short-lived mitigation in `docs/threat-model.md`
+- [X] T046 [US3] Configure JWT authorizer route scopes and access token validity 5–15 min in `infra/template.yaml`
+- [X] T047 [US3] Complete PKCE login/callback/logout flow in `frontend/src/auth/AuthProvider.tsx` and `frontend/src/pages/LoginCallbackPage.tsx`
+- [X] T048 [US3] Implement UX-only protected route guard in `frontend/src/auth/ProtectedRoute.tsx`
+- [X] T049 [US3] Document the access-token revocation limitation and short-lived mitigation in `docs/threat-model.md`
 
 **Checkpoint**: US3 funcional y verificable independientemente.
 
@@ -146,15 +146,15 @@ prohibidas directamente al backend y verificar 401/403/404 sin filtración.
 
 ### Tests for User Story 4
 
-- [ ] T050 [P] [US4] Unit test principal extraction ignores `donorSub`, roles and groups from body/query/headers in `backend/test/unit/authz/principal.test.ts`
-- [ ] T051 [P] [US4] Unit test RBAC/ownership policies deny DONANTE project management and GESTOR access to donor history in `backend/test/unit/authz/policies.test.ts`
-- [ ] T052 [P] [US4] Integration test DONANTE create/publish returns 403, GESTOR donor history returns 404 and body identity fields have no effect in `backend/test/integration/authz.roles.test.ts`
-- [ ] T053 [P] [US4] Contract test protected endpoints return uniform 401/403/404 error envelopes in `backend/test/contract/authz.errors.test.ts`
+- [X] T050 [P] [US4] Unit test principal extraction ignores `donorSub`, roles and groups from body/query/headers in `backend/test/unit/authz/principal.test.ts`
+- [X] T051 [P] [US4] Unit test RBAC/ownership policies deny DONANTE project management and GESTOR access to donor history in `backend/test/unit/authz/policies.test.ts`
+- [X] T052 [P] [US4] Integration test DONANTE create/publish returns 403, GESTOR donor history returns 404 and body identity fields have no effect in `backend/test/integration/authz.roles.test.ts`
+- [X] T053 [P] [US4] Contract test protected endpoints return uniform 401/403/404 error envelopes in `backend/test/contract/authz.errors.test.ts`
 
 ### Implementation for User Story 4
 
-- [ ] T054 [US4] Implement reusable authz middleware/handler wrappers combining principal extraction and RBAC/ownership guards in `backend/src/authz/middleware.ts` (each handler task T067, T074, T085 and T100 applies them to its own handlers)
-- [ ] T055 [US4] Complete uniform 403/404 response mapping without resource leakage in `backend/src/shared/http.ts`
+- [X] T054 [US4] Implement reusable authz middleware/handler wrappers combining principal extraction and RBAC/ownership guards in `backend/src/authz/middleware.ts` (each handler task T067, T074, T085 and T100 applies them to its own handlers)
+- [X] T055 [US4] Complete uniform 403/404 response mapping without resource leakage in `backend/src/shared/http.ts`
 
 **Checkpoint**: US4 funcional y verificable independientemente.
 
@@ -169,14 +169,14 @@ segundo caso obtiene tokens.
 
 ### Tests for User Story 5
 
-- [ ] T056 [P] [US5] Integration/manual test verifies GESTOR without second factor obtains no tokens in `backend/test/integration/auth.mfa-missing.test.ts`
-- [ ] T057 [P] [US5] Integration/manual test verifies GESTOR with TOTP obtains tokens and can access GESTOR operations in `backend/test/integration/auth.mfa-valid.test.ts`
+- [X] T056 [P] [US5] Integration/manual test verifies GESTOR without second factor obtains no tokens in `backend/test/integration/auth.mfa-missing.test.ts`
+- [X] T057 [P] [US5] Integration/manual test verifies GESTOR with TOTP obtains tokens and can access GESTOR operations in `backend/test/integration/auth.mfa-valid.test.ts`
 
 ### Implementation for User Story 5
 
-- [ ] T058 [US5] Configure Cognito TOTP MFA requirement for GESTOR/AUDITOR and disable SMS MFA in `infra/template.yaml`
-- [ ] T059 [US5] Implement frontend MFA challenge and incomplete-login error handling in `frontend/src/auth/AuthProvider.tsx`
-- [ ] T060 [US5] Document MFA setup, test evidence and no-SMS decision in `evidence/mfa.md`
+- [X] T058 [US5] Configure Cognito TOTP MFA requirement for GESTOR/AUDITOR and disable SMS MFA in `infra/template.yaml`
+- [X] T059 [US5] Implement frontend MFA challenge and incomplete-login error handling in `frontend/src/auth/AuthProvider.tsx`
+- [X] T060 [US5] Document MFA setup, test evidence and no-SMS decision in `evidence/mfa.md`
 
 **Checkpoint**: US5 funcional y verificable independientemente.
 

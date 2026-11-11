@@ -34,14 +34,14 @@ const MORE = [
   }),
 ];
 
-function handlerOver(items: readonly Record<string, unknown>[]) {
+function handlerOver(items: readonly object[]) {
   const client = createFakeProjectsDynamo(items);
   return createListProjectsHandler({
     repository: createProjectsRepository(client, "testProjects"),
     createLogger: (id) => createLogger(id, { sink: () => {} }),
   });
 }
-const invoke = (items: readonly Record<string, unknown>[], query?: Record<string, string>) =>
+const invoke = (items: readonly object[], query?: Record<string, string>) =>
   handlerOver(items)(buildJwtEvent({ authorizer: false, query }));
 
 describe("GET /v1/projects → 200", () => {

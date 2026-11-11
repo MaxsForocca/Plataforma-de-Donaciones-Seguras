@@ -226,14 +226,14 @@ esquemas JSON embebidos). `docs/api.yaml` se derivará de ese archivo durante la
 
 | Método | Ruta | Acceso | Módulo | Respuestas |
 |---|---|---|---|---|
-| GET | `/v1/projects` | Público | `projects` | 200 / 500 |
+| GET | `/v1/projects` | Público (sin parámetros de consulta) | `projects` | 200 / 400 / 500 |
 | GET | `/v1/projects/{projectId}` | Público | `projects` | 200 / 404 / 500 |
 | GET | `/v1/projects/{projectId}/stats` | Público | `projects` | 200 / 404 / 500 |
 | POST | `/v1/projects` | `api/projects.write` + GESTOR | `projects` | 201 / 400 / 401 / 403 / 500 |
 | PATCH | `/v1/projects/{projectId}/publish` | `api/projects.write` + GESTOR | `projects` | 200 / 401 / 403 / 404 / 409 / 500 |
 | POST | `/v1/donations` | `api/donations.write` + DONANTE; `Idempotency-Key` | `donations` | 201 / 400 / 401 / 403 / 404 / 409 / 500 |
 | POST | `/v1/donations/{donationId}/simulate` | `api/donations.write` + DONANTE propietario; solo stage `academic` | `donations` | 200 / 400 / 401 / 403 / 404 / 409 / 500 |
-| GET | `/v1/donations/me` | `api/donations.read` + DONANTE | `donations` | 200 / 401 / 500 |
+| GET | `/v1/donations/me` | `api/donations.read` + DONANTE | `donations` | 200 / 401 / 403 / 500 |
 | GET | `/v1/donations/{donationId}` | `api/donations.read` + DONANTE propietario | `donations` | 200 / 401 / 403 / 404 / 500 |
 
 Decisiones de contrato:

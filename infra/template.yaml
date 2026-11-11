@@ -4,8 +4,8 @@ Description: >
   Plataforma de Donaciones Seguras (proyecto académico, donaciones simuladas): tablas DynamoDB,
   Cognito (Authorization Code + PKCE, MFA TOTP), API Gateway HTTP API con JWT authorizer y
   funciones Lambda con IAM de privilegio mínimo. Las rutas protegidas se enlazan función por función
-  en las tareas de cada historia (T042, T067, T075, T093, T100); aquí solo existe la ruta de
-  simulación, exclusiva del stage `academic` (T027).
+  en las tareas de cada historia (T067, T075, T093, T100). Ya están enlazadas las rutas públicas del
+  catálogo (T042) y la de simulación, exclusiva del stage `academic` (T027).
 
 Parameters:
   Stage:
@@ -321,6 +321,13 @@ Resources:
             - Effect: Allow
               Action: dynamodb:Query
               Resource: !Sub "${ProjectsTable.Arn}/index/status-createdAt"
+      Events:
+        List:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /v1/projects
+            Method: GET
 
   GetProjectFunction:
     Type: AWS::Serverless::Function
@@ -361,6 +368,13 @@ Resources:
             - Effect: Allow
               Action: dynamodb:GetItem
               Resource: !GetAtt ProjectsTable.Arn
+      Events:
+        Stats:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /v1/projects/{projectId}/stats
+            Method: GET
 
   CreateProjectFunction:
     Type: AWS::Serverless::Function

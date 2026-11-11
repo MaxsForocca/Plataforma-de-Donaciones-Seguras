@@ -1,9 +1,13 @@
 /**
- * Proveedor de autenticación OIDC (T031). Authorization Code + PKCE, access token solo en memoria y
- * revocación del refresh token al cerrar sesión. Los grupos que expone son solo para UX: la
- * autorización real la decide siempre el backend.
+ * Proveedor de autenticación OIDC (T031, T047, T059). Authorization Code + PKCE, access token solo en
+ * memoria, revocación del refresh token al cerrar sesión y validación del ID token (emisor,
+ * audiencia, expiración y `token_use`) porque la biblioteca no la hace en el flujo de código. Los
+ * grupos que expone son solo para UX: la autorización real la decide siempre el backend.
+ *
+ * El desafío de segundo factor (MFA) ocurre dentro del Hosted UI de Cognito; la SPA solo recibe el
+ * resultado. Si el usuario no lo completa, el callback llega con un error y NO se inicia sesión.
  */
-import type { User } from "oidc-client-ts";
+import { ErrorResponse, type User } from "oidc-client-ts";
 import {
   createContext,
   useCallback,
@@ -26,7 +30,7 @@ export interface AuthContextValue {
   /** Access token vigente (solo en memoria) o `null`. */
   getAccessToken: () => string | null;
   login: (returnTo?: string) => Promise<void>;
-  /** Completa el callback del Hosted UI y devuelve la ruta interna a la que volver. */
+  /** Completa el callback del Hosted UI y devuelve la ruta interna a la que volver (`null` si falla). */
   completeLogin: () => Promise<string | null>;
   logout: () => Promise<void>;
 }
@@ -67,8 +71,37 @@ export function sanitizeReturnTo(value: unknown): string {
   return value;
 }
 
+export const LOGIN_FAILED_MESSAGE =
+  "No se pudo completar el inicio de sesión. Inténtelo nuevamente.";
+export const LOGIN_INCOMPLETE_MESSAGE =
+  "No se completó la verificación de identidad (segundo factor). Inicie sesión nuevamente.";
+
+/** Identidad esperada del ID token: el cliente de la SPA y el emisor del User Pool. */
+export interface ExpectedIdentity {
+  clientId: string;
+  issuer: string;
+}
+
 function isUsable(user: User | null | undefined): user is User {
   return !!user && !!user.access_token && !user.expired;
+}
+
+/**
+ * Valida el ID token (oidc-client-ts no verifica `iss`, `aud` ni `exp` en el flujo de código):
+ * emisor y audiencia propios, no vencido, `token_use=id`, y que no se haya devuelto el mismo token
+ * como access token.
+ */
+function isTrusted(user: User, expected: ExpectedIdentity | undefined): boolean {
+  if (!expected) return true;
+  const profile = user.profile as Record<string, unknown> | undefined;
+  if (!profile) return false;
+
+  const audience = Array.isArray(profile.aud) ? profile.aud : [profile.aud];
+  if (profile.iss !== expected.issuer || !audience.includes(expected.clientId)) return false;
+  if (typeof profile.exp !== "number" || profile.exp * 1000 <= Date.now()) return false;
+  if (profile.token_use !== "id") return false;
+  if (user.id_token && user.id_token === user.access_token) return false;
+  return true;
 }
 
 function groupsOf(user: User | null): readonly string[] {
@@ -82,22 +115,32 @@ export interface AuthProviderProps {
   manager: AuthManager;
   /** Parámetros de cierre de sesión de Cognito (`client_id` y `logout_uri`). */
   logout?: { clientId: string; logoutUri: string };
+  /** Si se indica, el ID token debe pertenecer a este cliente y emisor (main.tsx siempre lo pasa). */
+  identity?: ExpectedIdentity;
   children: ReactNode;
 }
 
-export function AuthProvider({ manager, logout: logoutParams, children }: AuthProviderProps) {
+export function AuthProvider({
+  manager,
+  logout: logoutParams,
+  identity,
+  children,
+}: AuthProviderProps) {
   // El usuario (con sus tokens) vive solo en una referencia en memoria; nunca en Web Storage.
   const userRef = useRef<User | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [groups, setGroups] = useState<readonly string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const apply = useCallback((user: User | null) => {
-    const usable = isUsable(user) ? user : null;
-    userRef.current = usable;
-    setGroups(groupsOf(usable));
-    setStatus(usable ? "authenticated" : "unauthenticated");
-  }, []);
+  const apply = useCallback(
+    (user: User | null) => {
+      const usable = isUsable(user) && isTrusted(user, identity) ? user : null;
+      userRef.current = usable;
+      setGroups(groupsOf(usable));
+      setStatus(usable ? "authenticated" : "unauthenticated");
+    },
+    [identity],
+  );
 
   useEffect(() => {
     let active = true;
@@ -146,16 +189,30 @@ export function AuthProvider({ manager, logout: logoutParams, children }: AuthPr
 
   const completeLogin = useCallback(async (): Promise<string | null> => {
     setError(null);
+    const reject = async (message: string): Promise<null> => {
+      // Nada de lo recibido debe quedar en memoria si se rechaza.
+      try {
+        await manager.removeUser();
+      } catch {
+        // sin usuario que eliminar
+      }
+      apply(null);
+      setError(message);
+      return null;
+    };
+
     try {
       const user = await manager.signinRedirectCallback();
+      if (!isUsable(user) || !isTrusted(user, identity)) return await reject(LOGIN_FAILED_MESSAGE);
       apply(user);
       return sanitizeReturnTo((user.state as { returnTo?: unknown } | undefined)?.returnTo);
-    } catch {
-      apply(null);
-      setError("No se pudo completar el inicio de sesión. Inténtelo nuevamente.");
-      return null;
+    } catch (caught) {
+      // access_denied: el usuario no completó la verificación (p. ej. el segundo factor).
+      // La descripción del error viene de la URL y no se muestra nunca.
+      const incomplete = caught instanceof ErrorResponse && caught.error === "access_denied";
+      return await reject(incomplete ? LOGIN_INCOMPLETE_MESSAGE : LOGIN_FAILED_MESSAGE);
     }
-  }, [manager, apply]);
+  }, [manager, apply, identity]);
 
   const logout = useCallback(async () => {
     setError(null);

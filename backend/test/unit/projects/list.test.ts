@@ -17,7 +17,7 @@ import { createFakeProjectsDynamo } from "../../helpers/fakeDynamo";
 import { buildJwtEvent, createRecordingClient } from "../../helpers/setup";
 
 const TABLE = "testProjects";
-const repoOver = (items: readonly Record<string, unknown>[], pageSize?: number) => {
+const repoOver = (items: readonly object[], pageSize?: number) => {
   const client = createFakeProjectsDynamo(items, { pageSize });
   return { client, repository: createProjectsRepository(client, TABLE) };
 };
@@ -140,7 +140,9 @@ describe("repository.listPublished — mapeo (CA-01.1)", () => {
   it("un catálogo sin proyectos publicados devuelve una lista vacía (CA-01.3)", async () => {
     const { repository } = repoOver([DRAFT_PROJECT]);
     expect(await repository.listPublished()).toEqual([]);
-    expect(await createProjectsRepository(createFakeProjectsDynamo([]), TABLE).listPublished()).toEqual([]);
+    expect(
+      await createProjectsRepository(createFakeProjectsDynamo([]), TABLE).listPublished(),
+    ).toEqual([]);
   });
 
   it("tolera una respuesta sin Items", async () => {
@@ -178,9 +180,14 @@ describe("repository.listPublished — los borradores nunca aparecen (CA-01.2)",
 
   it("con varios borradores y publicados mezclados, solo salen los publicados", async () => {
     const drafts = Array.from({ length: 10 }, (_, i) =>
-      makeProject({ projectId: `00000000-0000-4000-8000-0000000001${String(i).padStart(2, "0")}`, status: "BORRADOR" }),
+      makeProject({
+        projectId: `00000000-0000-4000-8000-0000000001${String(i).padStart(2, "0")}`,
+        status: "BORRADOR",
+      }),
     );
-    const client = createRecordingClient(() => ({ Items: [...drafts, PUBLISHED_PROJECT, SECOND_PUBLISHED] }));
+    const client = createRecordingClient(() => ({
+      Items: [...drafts, PUBLISHED_PROJECT, SECOND_PUBLISHED],
+    }));
     const result = await createProjectsRepository(client, TABLE).listPublished();
     expect(result).toHaveLength(2);
   });
@@ -248,12 +255,19 @@ describe("repository.listPublished — integridad de los importes (principio III
 describe("handler listProjects", () => {
   const sink = () => {
     const lines: string[] = [];
-    return { lines, createLogger: (requestId: string) => createLogger(requestId, { sink: (l) => lines.push(l) }) };
+    return {
+      lines,
+      createLogger: (requestId: string) => createLogger(requestId, { sink: (l) => lines.push(l) }),
+    };
   };
-  const handlerOver = (items: readonly Record<string, unknown>[] = [PUBLISHED_PROJECT, DRAFT_PROJECT]) => {
+  const handlerOver = (items: readonly object[] = [PUBLISHED_PROJECT, DRAFT_PROJECT]) => {
     const { client, repository } = repoOver(items);
     const logs = sink();
-    return { client, ...logs, handler: createListProjectsHandler({ repository, createLogger: logs.createLogger }) };
+    return {
+      client,
+      ...logs,
+      handler: createListProjectsHandler({ repository, createLogger: logs.createLogger }),
+    };
   };
 
   it("responde 200 con la lista de resúmenes públicos", async () => {
@@ -327,7 +341,9 @@ describe("handler listProjects", () => {
 
     it("el 400 no revela el nombre ni el valor del parámetro rechazado", async () => {
       const { handler } = handlerOver();
-      const response = await handler(buildJwtEvent({ authorizer: false, query: { limit: "-1337" } }));
+      const response = await handler(
+        buildJwtEvent({ authorizer: false, query: { limit: "-1337" } }),
+      );
       expect(response.body).not.toMatch(/limit|1337/);
     });
 
@@ -410,7 +426,11 @@ describe("handler listProjects", () => {
       });
       await handler(buildJwtEvent({ authorizer: false }));
       const entry = JSON.parse(lines.at(-1)!);
-      expect(entry).toMatchObject({ result: "error", statusCode: 500, errorCode: "INTERNAL_ERROR" });
+      expect(entry).toMatchObject({
+        result: "error",
+        statusCode: 500,
+        errorCode: "INTERNAL_ERROR",
+      });
       expect(lines.join("\n")).not.toContain("boom interno");
     });
 

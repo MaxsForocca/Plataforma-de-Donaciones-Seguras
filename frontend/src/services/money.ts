@@ -14,3 +14,15 @@ export function formatPen(cents: number): string {
   const fraction = (absolute % 100n).toString().padStart(2, "0");
   return `${cents < 0 ? "-" : ""}S/ ${whole}.${fraction}`;
 }
+
+/**
+ * Porcentaje entero de `part` sobre `whole`, redondeado hacia abajo y limitado a 100. Usa BigInt: no
+ * hay aritmética de punto flotante. Nunca muestra 100 % antes de alcanzar la meta.
+ */
+export function percentOf(part: number, whole: number): number {
+  if (!Number.isSafeInteger(part) || !Number.isSafeInteger(whole) || part < 0 || whole <= 0) {
+    throw new RangeError("part debe ser un entero >= 0 y whole un entero > 0");
+  }
+  const percent = (BigInt(part) * 100n) / BigInt(whole);
+  return percent > 100n ? 100 : Number(percent);
+}

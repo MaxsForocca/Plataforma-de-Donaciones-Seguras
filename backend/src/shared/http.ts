@@ -84,7 +84,12 @@ export function toErrorResponse(
   requestId: string,
 ): APIGatewayProxyStructuredResultV2 {
   const appError = toAppError(error);
-  return jsonResponse(appError.statusCode, errorEnvelope(appError.code, requestId));
+  const response = jsonResponse(appError.statusCode, errorEnvelope(appError.code, requestId));
+  if (appError.statusCode === 401) {
+    // RFC 6750: desafío genérico, sin código de error ni motivo (no se revela por qué falló).
+    response.headers = { ...response.headers, "www-authenticate": "Bearer" };
+  }
+  return response;
 }
 
 /** Normaliza un error cualquiera a `AppError` (errores de validación Zod → 400). */

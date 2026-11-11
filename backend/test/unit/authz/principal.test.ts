@@ -288,3 +288,126 @@ describe("parseListClaim", () => {
     expect(parseListClaim(input)).toEqual(expected);
   });
 });
+
+describe("T050 (extensión): tokens alterados y casos extremos", () => {
+  it.each([
+    ["token_use como arreglo", { token_use: ["access"] }],
+    ["token_use con espacio", { token_use: "access " }],
+    ["client_id como arreglo", { client_id: [TEST_CLIENT_ID] }],
+    ["client_id como número", { client_id: 123 }],
+    ["sub como objeto", { sub: { toString: (): string => "abc" } }],
+    ["sub como arreglo", { sub: ["abc"] }],
+    ["exp como arreglo", { exp: [9_999_999_999] }],
+    ["exp como objeto", { exp: {} }],
+    ["exp negativo", { exp: "-1" }],
+    ["exp cero", { exp: "0" }],
+    ["exp Infinity", { exp: "Infinity" }],
+    ["exp en notación inválida", { exp: "1e" }],
+  ])("%s → 401", (_label, claims) => {
+    expect401(() => principalOf(buildJwtEvent({ claims })));
+  });
+
+  it("acepta exp numérico y exp como texto con espacios (el authorizer ya validó la firma)", () => {
+    expect(() => principalOf(buildJwtEvent({ claims: { exp: 9_999_999_999 } }))).not.toThrow();
+    expect(() => principalOf(buildJwtEvent({ claims: { exp: " 9999999999 " } }))).not.toThrow();
+  });
+
+  it("un emisor con barra final NO coincide (comparación exacta)", () => {
+    expect401(() =>
+      principalOf(buildJwtEvent({ issuer: `${TEST_ISSUER}/` }), { expectedIssuer: TEST_ISSUER }),
+    );
+  });
+
+  it("un expectedClientId vacío falla cerrado (ningún token coincide)", () => {
+    expect401(() => principalOf(buildJwtEvent(), { expectedClientId: "" }));
+  });
+
+  it("un expectedIssuer vacío falla cerrado", () => {
+    expect401(() => principalOf(buildJwtEvent(), { expectedIssuer: "" }));
+  });
+
+  describe("nombres de grupo que parecen un rol pero no lo son", () => {
+    it.each([
+      ["espacio de ancho cero", "GESTOR\u200b"],
+      ["letras de ancho completo", "ＧＥＳＴＯＲ"],
+      ["minúsculas", "gestor"],
+      ["capitalizado", "Gestor"],
+      ["con prefijo", "XGESTOR"],
+      ["con sufijo", "GESTORS"],
+      ["homoglifo cirílico (Е)", "GЕSTOR"],
+    ])("%s no concede el rol", (_label, group) => {
+      expect(principalOf(buildJwtEvent({ groups: [group] })).roles).toEqual([]);
+    });
+
+    it("el formato de HTTP API separa los grupos por espacios: un 'nombre' con espacio se lee como dos (Cognito no admite espacios en nombres de grupo)", () => {
+      const principal = principalOf(buildJwtEvent({ groups: "[ADMIN GESTOR]" }));
+      expect(principal.roles).toEqual(["GESTOR"]);
+    });
+
+    it("un espacio no separable (NBSP) alrededor del nombre se descarta como separador", () => {
+      expect(principalOf(buildJwtEvent({ groups: "[\u00a0GESTOR\u00a0]" })).roles).toEqual([
+        "GESTOR",
+      ]);
+    });
+  });
+
+  it("una lista enorme de grupos (10 000) se procesa rápido y solo conserva los roles válidos", () => {
+    const groups = [...Array.from({ length: 10_000 }, (_, i) => `GRUPO_${i}`), "AUDITOR"];
+    const started = performance.now();
+    const principal = principalOf(buildJwtEvent({ groups }));
+    expect(performance.now() - started).toBeLessThan(500);
+    expect(principal.roles).toEqual(["AUDITOR"]);
+  });
+
+  describe("scopes", () => {
+    it("un elemento del arreglo con espacios NO se parte en varios scopes", () => {
+      const principal = principalOf(
+        buildJwtEvent({ scopes: ["api/donations.read api/donations.write"] }),
+      );
+      expect(principal.scopes).toEqual(["api/donations.read api/donations.write"]);
+      expect(principal.scopes).not.toContain("api/donations.write");
+    });
+
+    it("el claim scope se separa por cualquier espacio en blanco (tab, salto de línea)", () => {
+      const principal = principalOf(
+        buildJwtEvent({
+          scopes: null,
+          claims: { scope: "openid\tapi/donations.read\napi/donations.write" },
+        }),
+      );
+      expect(principal.scopes).toEqual(["openid", "api/donations.read", "api/donations.write"]);
+    });
+
+    it("elimina duplicados", () => {
+      const principal = principalOf(
+        buildJwtEvent({ scopes: ["api/donations.read", "api/donations.read"] }),
+      );
+      expect(principal.scopes).toEqual(["api/donations.read"]);
+    });
+
+    it("jwt.scopes vacío NO recurre al claim scope (el authorizer manda)", () => {
+      const principal = principalOf(
+        buildJwtEvent({ scopes: [], claims: { scope: "api/projects.write" } }),
+      );
+      expect(principal.scopes).toEqual([]);
+    });
+
+    it("los scopes no se infieren de los roles", () => {
+      expect(principalOf(buildJwtEvent({ groups: ["GESTOR"], scopes: [] })).scopes).toEqual([]);
+    });
+  });
+
+  it("el principal no incluye el token ni claims adicionales (no se puede filtrar sin querer)", () => {
+    const principal = principalOf(
+      donanteEvent({ claims: { email: "persona@example.com", jti: "id-token", custom: "x" } }),
+    );
+    expect(Object.keys(principal).sort()).toEqual(["clientId", "roles", "scopes", "sub"]);
+    expect(JSON.stringify(principal)).not.toMatch(/persona@|id-token/);
+  });
+
+  it("CA-03.4 (lado backend): el mismo token se acepta hasta su exp y se rechaza desde ese instante", () => {
+    const event = donanteEvent({ expiresInSeconds: 900 });
+    expect(() => buildPrincipal(event, { now: () => FIXED_NOW_MS + 899_000 })).not.toThrow();
+    expect401(() => buildPrincipal(event, { now: () => FIXED_NOW_MS + 900_000 }));
+  });
+});

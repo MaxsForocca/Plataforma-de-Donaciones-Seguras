@@ -25,10 +25,11 @@ function project(item: Item, projection: string | undefined, names: Record<strin
 }
 
 export function createFakeProjectsDynamo(
-  items: readonly Item[],
+  items: readonly object[],
   options: FakeProjectsOptions = {},
 ): RecordingClient & DocClient {
   const tableName = options.tableName ?? "testProjects";
+  const rows = items as readonly Item[];
 
   return createRecordingClient((call: RecordedCall) => {
     const input = call.input;
@@ -41,7 +42,7 @@ export function createFakeProjectsDynamo(
 
     if (call.name === "GetCommand") {
       const key = (input.Key as Item).projectId;
-      const found = items.find((item) => item.projectId === key);
+      const found = rows.find((item) => item.projectId === key);
       return found
         ? { Item: project(found, input.ProjectionExpression as string | undefined, names) }
         : {};
@@ -52,20 +53,24 @@ export function createFakeProjectsDynamo(
         return Object.assign(new Error("ValidationException"), { name: "ValidationException" });
       }
       const status = (input.ExpressionAttributeValues as Item)[":s"];
-      let matching = items
+      let matching = rows
         .filter((item) => item.status === status)
         .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
       if (input.ScanIndexForward === false) matching = matching.reverse();
 
       const start = input.ExclusiveStartKey
-        ? matching.findIndex((item) => item.projectId === (input.ExclusiveStartKey as Item).projectId) + 1
+        ? matching.findIndex(
+            (item) => item.projectId === (input.ExclusiveStartKey as Item).projectId,
+          ) + 1
         : 0;
       const pageSize = options.pageSize ?? matching.length;
       const page = matching.slice(start, start + pageSize);
       const more = start + pageSize < matching.length;
 
       return {
-        Items: page.map((item) => project(item, input.ProjectionExpression as string | undefined, names)),
+        Items: page.map((item) =>
+          project(item, input.ProjectionExpression as string | undefined, names),
+        ),
         Count: page.length,
         ...(more ? { LastEvaluatedKey: { projectId: page[page.length - 1]!.projectId } } : {}),
       };

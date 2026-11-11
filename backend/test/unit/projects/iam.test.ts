@@ -51,7 +51,10 @@ const resourcesOf = (name: string) => statementsOf(name).flatMap((s) => asList(s
 const WRITE_ACTION = /(Put|Update|Delete|Batch|Transact|ConditionCheck|Create|Restore|Import|Tag)/;
 
 const PUBLIC_READ: Record<string, { actions: string[]; resourceHint: RegExp }> = {
-  ListProjectsFunction: { actions: ["dynamodb:Query"], resourceHint: /^\$\{ProjectsTable\.Arn\}\/index\/status-createdAt$/ },
+  ListProjectsFunction: {
+    actions: ["dynamodb:Query"],
+    resourceHint: /^\$\{ProjectsTable\.Arn\}\/index\/status-createdAt$/,
+  },
   GetProjectFunction: { actions: ["dynamodb:GetItem"], resourceHint: /^ProjectsTable\.Arn$/ },
   GetProjectStatsFunction: { actions: ["dynamodb:GetItem"], resourceHint: /^ProjectsTable\.Arn$/ },
 };
@@ -71,7 +74,8 @@ describe("T10: funciones públicas de lectura sin permisos de escritura", () => 
     });
 
     it("no usa comodines en acciones ni recursos", () => {
-      for (const value of [...actionsOf(name), ...resourcesOf(name)]) expect(value).not.toContain("*");
+      for (const value of [...actionsOf(name), ...resourcesOf(name)])
+        expect(value).not.toContain("*");
     });
 
     it("solo accede a la tabla Projects (ni Donations, ni Idempotency, ni AuditEvents)", () => {
@@ -104,14 +108,21 @@ describe("T10: funciones públicas de lectura sin permisos de escritura", () => 
       .filter((name) => actionsOf(name).some((action) => WRITE_ACTION.test(action)))
       .sort();
     expect(writers).toEqual(
-      ["CreateDonationFunction", "CreateProjectFunction", "PublishProjectFunction", "SimulateDonationFunction"].sort(),
+      [
+        "CreateDonationFunction",
+        "CreateProjectFunction",
+        "PublishProjectFunction",
+        "SimulateDonationFunction",
+      ].sort(),
     );
   });
 });
 
 describe("T042: rutas públicas del catálogo", () => {
   const routesOf = (name: string) =>
-    Object.values(template.Resources[name]!.Properties.Events ?? {}).map((event) => event.Properties);
+    Object.values(template.Resources[name]!.Properties.Events ?? {}).map(
+      (event) => event.Properties,
+    );
 
   it("el listado expone solo GET /v1/projects, sin autenticación", () => {
     const routes = routesOf("ListProjectsFunction");

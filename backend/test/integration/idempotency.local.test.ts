@@ -19,9 +19,9 @@ import {
   makeDonation,
   PUBLISHED_PROJECT_ID,
 } from "../helpers/fixtures";
-import { createLocalClients, hasLocalDynamo, resetTables, testConfig } from "../helpers/setup";
+import { createLocalClients, hasLocalDynamo, isolatedConfig, resetTables } from "../helpers/setup";
 
-const config = testConfig();
+const config = isolatedConfig("idem");
 const payload = { projectId: PUBLISHED_PROJECT_ID, amountCents: 500 };
 
 describe.skipIf(!hasLocalDynamo())("DynamoDB Local: idempotencia atómica y auditoría", () => {

@@ -22,7 +22,9 @@ afterEach(() => {
 
 function renderApp(path: string, auth: AuthContextValue = fakeAuth(), strict = false) {
   const tree = (
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
       <AuthContext.Provider value={auth}>
         <MemoryRouter initialEntries={[path]}>
           <AppRoutes />
@@ -170,14 +172,12 @@ describe("callback de inicio de sesión", () => {
     expect(completeLogin).toHaveBeenCalledTimes(1);
   });
 
-  it("si el login falla vuelve al catálogo", async () => {
+  it("si el login falla permanece en el callback y explica el problema (no redirige en silencio)", async () => {
     const completeLogin = vi.fn(async () => null);
     renderApp("/callback?code=abc", fakeAuth({ completeLogin }));
-    await waitFor(() =>
-      expect(
-        screen.getByRole("heading", { level: 1, name: "Catálogo de proyectos" }),
-      ).toBeInTheDocument(),
-    );
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "No se pudo iniciar sesión" }),
+    ).toBeInTheDocument();
     expect(completeLogin).toHaveBeenCalledTimes(1);
   });
 

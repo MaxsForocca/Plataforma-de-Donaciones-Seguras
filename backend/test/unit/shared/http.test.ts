@@ -210,3 +210,50 @@ describe("parseJsonBody", () => {
     expect(Object.keys(parsed)).toEqual(["__proto__"]);
   });
 });
+
+describe("T055: mapeo uniforme de 401/403/404 sin filtración", () => {
+  it("el 401 incluye el desafío WWW-Authenticate: Bearer (RFC 6750), sin código de error ni motivo", () => {
+    const response = toErrorResponse(unauthorized("token vencido por 3 minutos"), "r");
+    expect(response.headers?.["www-authenticate"]).toBe("Bearer");
+    expect(JSON.stringify(response)).not.toMatch(/vencido|minutos|invalid_token/);
+  });
+
+  it.each([
+    ["403", forbidden("x")],
+    ["404", notFound("x")],
+    ["409", conflict("x")],
+    ["400", badRequest()],
+    ["500", internalError("x")],
+  ])("el %s no incluye WWW-Authenticate", (_label, error) => {
+    expect(toErrorResponse(error, "r").headers?.["www-authenticate"]).toBeUndefined();
+  });
+
+  it("403 y 404 tienen el mismo formato (mismas claves, mismas cabeceras) y solo difieren en código y mensaje", () => {
+    const f = toErrorResponse(forbidden("detalle A"), "r");
+    const n = toErrorResponse(notFound("detalle B"), "r");
+    expect(Object.keys(JSON.parse(f.body as string)).sort()).toEqual(
+      Object.keys(JSON.parse(n.body as string)).sort(),
+    );
+    expect(f.headers).toEqual(n.headers);
+  });
+
+  it.each([
+    ["401", unauthorized("sub=abc rol=GESTOR")],
+    ["403", forbidden("scope api/projects.write ausente")],
+    ["404", notFound("donación d-1 de bbbbbbbb")],
+  ])("el %s no contiene el detalle interno (ids, roles, scopes)", (_label, error) => {
+    const { body } = toErrorResponse(error, "req-9");
+    expect(body).not.toMatch(/sub=|rol=|GESTOR|scope|api\/projects|d-1|bbbbbbbb/);
+    expect(JSON.parse(body as string)).toEqual({
+      code: error.code,
+      message: error.publicMessage,
+      requestId: "req-9",
+    });
+  });
+
+  it("el mensaje público depende solo del código: mismo código ⇒ mismo texto", () => {
+    expect(forbidden("a").publicMessage).toBe(forbidden("b").publicMessage);
+    expect(notFound("a").publicMessage).toBe(notFound("b").publicMessage);
+    expect(unauthorized("a").publicMessage).toBe(unauthorized("b").publicMessage);
+  });
+});

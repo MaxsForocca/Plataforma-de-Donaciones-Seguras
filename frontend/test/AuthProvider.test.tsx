@@ -165,13 +165,17 @@ describe("completeLogin", () => {
     expect(result.current.error).not.toContain("abc");
   });
 
-  it("un callback que devuelve un usuario ya expirado no deja sesión", async () => {
+  it("un callback que devuelve un usuario ya expirado no deja sesión y devuelve null (no navega)", async () => {
     const { result, manager } = setup();
     manager.signinRedirectCallback.mockResolvedValueOnce(makeUser({ expired: true }));
+    let returnTo: string | null = "x";
     await act(async () => {
-      await result.current.completeLogin();
+      returnTo = await result.current.completeLogin();
     });
+    expect(returnTo).toBeNull();
     expect(result.current.status).toBe("unauthenticated");
+    expect(result.current.getAccessToken()).toBeNull();
+    expect(result.current.error).toMatch(/No se pudo completar/);
   });
 });
 

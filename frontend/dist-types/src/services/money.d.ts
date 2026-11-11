@@ -5,3 +5,8 @@
  */
 /** `1050` → `"S/ 10.50"`; `100000` → `"S/ 1,000.00"`. Lanza `RangeError` si no es un entero seguro. */
 export declare function formatPen(cents: number): string;
+/**
+ * Porcentaje entero de `part` sobre `whole`, redondeado hacia abajo y limitado a 100. Usa BigInt: no
+ * hay aritmética de punto flotante. Nunca muestra 100 % antes de alcanzar la meta.
+ */
+export declare function percentOf(part: number, whole: number): number;
