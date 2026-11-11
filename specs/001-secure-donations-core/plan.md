@@ -51,7 +51,7 @@ visitante), 9 endpoints HTTP, 4 tablas DynamoDB y hasta 50 proyectos de prueba.
 
 | Principio | Gate | Resultado |
 |---|---|---|
-| I. Zero Trust estricto | JWT authorizer valida firma, emisor, expiración, `client_id`, `token_use=access` y scopes; `authz` deriva `sub` y grupos solo de claims; RBAC y ownership en backend; roles IAM por función. | PASS |
+| I. Zero Trust estricto | JWT authorizer valida firma, emisor, expiración, audiencia/`client_id` y scopes exigidos en todas las rutas protegidas (los ID tokens no portan esos scopes y se rechazan); `authz` verifica además `token_use=access` y deriva `sub` y grupos solo de claims; RBAC y ownership en backend; roles IAM por función. | PASS |
 | II. Prohibición de Bootstrap y Next.js | Stack React + Vite + Tailwind; CI falla si aparecen `bootstrap` o `next` en manifiestos, lockfile o imports. | PASS |
 | III. Dinero en céntimos enteros | `amountCents`, `goalAmountCents` y `confirmedAmountCents` son enteros; Zod rechaza flotantes; DynamoDB usa tipo N; formato PEN solo en presentación. | PASS |
 | IV. Idempotencia atómica | `POST /v1/donations` exige `Idempotency-Key`; `TransactWriteItems` escribe clave, donación, condición de proyecto y evento de auditoría en una sola operación condicionada. | PASS |
@@ -146,7 +146,8 @@ refina la propuesta de `design.md` §8 para evitar duplicar contratos entre fron
 ### Frontend
 
 - SPA React 19 + Vite + Tailwind; React Router para rutas públicas y protegidas.
-- Login con Authorization Code + PKCE mediante oidc-client-ts; tokens solo en memoria.
+- Login con Authorization Code + PKCE mediante oidc-client-ts; tokens solo en memoria (el
+  `userStore` usa `InMemoryWebStorage`, nunca `localStorage` ni `sessionStorage`).
 - TanStack Query para catálogo, detalle, estadísticas, historial y mutaciones.
 - React Hook Form + Zod para validación de UX; la autorización nunca se decide en la SPA.
 - Vistas: catálogo, detalle con indicadores, callback de login, formulario de donación, simulación
@@ -178,8 +179,8 @@ Una función Lambda por caso de uso, con rol IAM mínimo:
 | `getProjectStatsFn` | `Projects`: GetItem |
 | `createProjectFn` | `Projects`: PutItem; `AuditEvents`: PutItem |
 | `publishProjectFn` | `Projects`: UpdateItem; `AuditEvents`: PutItem |
-| `createDonationFn` | `Donations`: PutItem; `Idempotency`: PutItem; `Projects`: ConditionCheck; `AuditEvents`: PutItem |
-| `simulateDonationFn` | `Donations`: UpdateItem; `Projects`: UpdateItem; `AuditEvents`: PutItem |
+| `createDonationFn` | `Projects`: GetItem (lectura previa) y ConditionCheck; `Donations`: PutItem; `Idempotency`: PutItem; `AuditEvents`: PutItem |
+| `simulateDonationFn` | `Donations`: GetItem (lectura previa) y UpdateItem; `Projects`: UpdateItem; `AuditEvents`: PutItem |
 | `listMyDonationsFn` | `Donations`: Query GSI |
 | `getDonationFn` | `Donations`: GetItem |
 
@@ -199,9 +200,16 @@ Los detalles completos están en [data-model.md](./data-model.md).
 Reglas clave:
 
 - Todos los importes son enteros `N` en céntimos de PEN.
+- Antes de transaccionar, la creación de donación lee el proyecto con `GetItem` (`ConsistentRead`):
+  si no existe responde 404 sin abrir la transacción (el 404 no proviene de una transacción
+  cancelada). Si existe, continúa y la condición de la transacción decide el 409 por proyecto no
+  público.
 - La creación de donación usa `TransactWriteItems` con: `Put Idempotency` condicionado a
   `attribute_not_exists(pk)`, `Put Donation` condicionado a `attribute_not_exists(donationId)`,
   `ConditionCheck Project` con `status = PUBLICADO` y `Put AuditEvent`.
+- Antes de transaccionar, la simulación lee la donación con `GetItem` (`ConsistentRead`): si no
+  existe o su `donorSub` no coincide con el `sub` autenticado responde 404 sin abrir la transacción;
+  una cancelación posterior de la transacción (estado ya terminal o carrera) responde 409.
 - La simulación usa `TransactWriteItems`: `Update Donation` condicionado a
   `status = PENDIENTE_SIMULACION` y `donorSub = :sub`; si confirma, `Update Project` con
   `ADD confirmedAmountCents :amount`; siempre `Put AuditEvent`.

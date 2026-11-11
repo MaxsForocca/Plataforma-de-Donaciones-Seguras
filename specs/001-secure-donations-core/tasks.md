@@ -64,19 +64,20 @@ independientes. Los identificadores CA se conservan literalmente.
 - [ ] T018 [P] Implement structured JSON logger with `requestId`, action, result, HTTP status and duration, excluding secrets and personal data, in `backend/src/shared/logger.ts`
 - [ ] T019 Implement idempotency helpers using PK `donorSub#createDonation#idempotencyKey`, `payloadHash` and TTL `expiresAt` of 24 h in `backend/src/shared/idempotency.ts`
 - [ ] T020 Complete audit module write path for `PROJECT_CREATED`, `PROJECT_PUBLISHED`, `DONATION_CREATED`, `DONATION_CONFIRMED`, `DONATION_REJECTED` and `ACCESS_DENIED` in `backend/src/audit/repository.ts`
-- [ ] T021 Implement authz principal extraction from API Gateway authorizer context (`sub`, groups, scopes) with no trust in body/query/headers in `backend/src/authz/principal.ts`
+- [ ] T021 Implement authz principal extraction from API Gateway authorizer context (`sub`, groups, scopes) with no trust in body/query/headers, and verify `token_use=access` as defense in depth, in `backend/src/authz/principal.ts`
 - [ ] T022 Implement RBAC and ownership guards for GESTOR, DONANTE and AUDITOR in `backend/src/authz/policies.ts`
 - [ ] T023 Define `Projects`, `Donations`, `Idempotency` and `AuditEvents` DynamoDB tables in `infra/template.yaml`: Projects PK `projectId` + GSI `status-createdAt`; Donations PK `donationId` + GSI `donorSub-createdAt`; Idempotency PK `pk` + TTL `expiresAt`; AuditEvents PK `eventType` + SK `timestamp#eventId`; on-demand billing
 - [ ] T024 Define Cognito User Pool, groups `DONANTE|GESTOR|AUDITOR`, app client with Authorization Code + PKCE, access token validity 5–15 min and TOTP MFA for GESTOR/AUDITOR in `infra/template.yaml`
-- [ ] T025 Define API Gateway HTTP API, Cognito JWT authorizer, scopes `api/projects.write`, `api/donations.write`, `api/donations.read` and `api/audit.read` in `infra/template.yaml`
+- [ ] T025 Define API Gateway HTTP API, Cognito JWT authorizer, scopes `api/projects.write`, `api/donations.write`, `api/donations.read` and `api/audit.read`, with `authorizationScopes` required on every protected route so ID tokens are rejected, in `infra/template.yaml`
 - [ ] T026 Define base Lambda functions and least-privilege IAM roles for public project reads and protected handlers in `infra/template.yaml`
 - [ ] T027 Add stage-conditional academic-only simulation route so the path does not exist outside `Stage=academic` in `infra/template.yaml`
 - [ ] T028 Create backend test harness for authorizer context, DynamoDB tables and fixtures in `backend/test/helpers/setup.ts`
 - [ ] T029 Implement reproducible seed data with at least one PUBLICADO project, one BORRADOR project and donations in PENDIENTE_SIMULACION, CONFIRMADA_SIMULADA and RECHAZADA_SIMULADA in `scripts/seed.ts`
 - [ ] T030 Implement frontend API client with bearer token injection and QueryClient provider in `frontend/src/services/apiClient.ts` and `frontend/src/services/queryClient.ts`
-- [ ] T031 Implement OIDC auth provider with Authorization Code + PKCE, in-memory tokens and revoke-on-logout in `frontend/src/auth/AuthProvider.tsx`
+- [ ] T031 Implement OIDC auth provider with Authorization Code + PKCE, in-memory tokens (`userStore: new WebStorageStateStore({ store: new InMemoryWebStorage() })`, never `localStorage`/`sessionStorage`) and revoke-on-logout in `frontend/src/auth/AuthProvider.tsx`
 - [ ] T032 Implement app shell, public/protected routes and UX-only protected route guard in `frontend/src/App.tsx` and `frontend/src/components/Layout.tsx`
 - [ ] T033 [P] Implement integer-cents to PEN display formatting without float arithmetic in `frontend/src/services/money.ts`
+- [ ] T065 [P] Create test fixtures for published, draft and donation states in `backend/test/helpers/fixtures.ts`
 
 **Checkpoint**: Foundation ready — las historias pueden comenzar.
 
@@ -151,7 +152,7 @@ prohibidas directamente al backend y verificar 401/403/404 sin filtración.
 
 ### Implementation for User Story 4
 
-- [ ] T054 [US4] Wire authz principal and guards into project and donation handlers in `backend/src/authz/middleware.ts`
+- [ ] T054 [US4] Implement reusable authz middleware/handler wrappers combining principal extraction and RBAC/ownership guards in `backend/src/authz/middleware.ts` (each handler task T067, T074, T085 and T100 applies them to its own handlers)
 - [ ] T055 [US4] Complete uniform 403/404 response mapping without resource leakage in `backend/src/shared/http.ts`
 
 **Checkpoint**: US4 funcional y verificable independientemente.
@@ -193,12 +194,11 @@ verificar PUBLICADO y visible; intentar como DONANTE y verificar 401/403; public
 - [ ] T062 [P] [US9] Contract test `POST /v1/projects` returns 201/400/401/403 and a BORRADOR project in `backend/test/contract/projects.create.test.ts`
 - [ ] T063 [P] [US9] Contract test `PATCH /v1/projects/{projectId}/publish` returns 200/404/409 in `backend/test/contract/projects.publish.test.ts`
 - [ ] T064 [P] [US9] Integration test GESTOR create/publish, DONANTE 403, already-published 409 and audit events in `backend/test/integration/projects.manage.test.ts`
-- [ ] T065 [P] [US9] Create test fixtures for published, draft and donation states in `backend/test/helpers/fixtures.ts`
 
 ### Implementation for User Story 9
 
 - [ ] T066 [US9] Implement project create/publish repository with conditional writes and audit transaction in `backend/src/projects/repository.ts`
-- [ ] T067 [US9] Implement `createProject` and `publishProject` handlers and wire Lambda/IAM permissions in `backend/src/projects/handlers/createProject.ts`, `backend/src/projects/handlers/publishProject.ts` and `infra/template.yaml`
+- [ ] T067 [US9] Implement `createProject` and `publishProject` handlers applying the authz middleware from T054 and wire Lambda/IAM permissions in `backend/src/projects/handlers/createProject.ts`, `backend/src/projects/handlers/publishProject.ts` and `infra/template.yaml`
 
 **Checkpoint**: US9 funcional y verificable independientemente.
 
@@ -223,8 +223,8 @@ repetir la misma clave con la misma y distinta carga, y probar montos inválidos
 ### Implementation for User Story 6
 
 - [ ] T073 [US6] Implement donation creation repository with one `TransactWriteItems` for `Idempotency` (`attribute_not_exists(pk)`), `Donations`, `Projects` `ConditionCheck` `status = PUBLICADO` and `AuditEvents` in `backend/src/donations/repository.ts`
-- [ ] T074 [US6] Implement `createDonation` handler deriving `donorSub` from authz and mapping transaction failures to 400/404/409 in `backend/src/donations/handlers/createDonation.ts`
-- [ ] T075 [US6] Wire donation creation Lambda, route and least-privilege IAM permissions in `infra/template.yaml`
+- [ ] T074 [US6] Implement `createDonation` handler applying the authz middleware from T054 and deriving `donorSub` from authz; read the project with `GetItem` before the transaction and return 404 if it does not exist, then map transaction cancellations to 409 (idempotency conflict or non-PUBLICADO project) and validation failures to 400 in `backend/src/donations/handlers/createDonation.ts`
+- [ ] T075 [US6] Wire donation creation Lambda, route and least-privilege IAM permissions (including `Projects` `GetItem`) in `infra/template.yaml`
 - [ ] T076 [US6] Implement DonationPage with React Hook Form + Zod, cents conversion, UUID `Idempotency-Key` and 201/400/409 states in `frontend/src/pages/DonationPage.tsx`
 - [ ] T077 [US6] Frontend test DonationPage validation, UUID generation and error states in `frontend/test/DonationPage.test.tsx`
 
@@ -252,8 +252,8 @@ concurrentar la transición, y verificar el acumulado y el aviso académico.
 ### Implementation for User Story 7
 
 - [ ] T084 [US7] Implement simulation transaction in `backend/src/donations/repository.ts`: update donation with condition `status = PENDIENTE_SIMULACION` and `donorSub = :sub`, `ADD confirmedAmountCents` only on confirmation, and audit event
-- [ ] T085 [US7] Implement `simulateDonation` handler with ownership/state checks and 403/404/409 mapping in `backend/src/donations/handlers/simulateDonation.ts`
-- [ ] T086 [US7] Wire simulation Lambda and academic-only route with least-privilege IAM in `infra/template.yaml`
+- [ ] T085 [US7] Implement `simulateDonation` handler applying the authz middleware from T054; read the donation with `GetItem` before the transaction and return 404 if it does not exist or belongs to another `donorSub`, then map transaction cancellation (terminal state or race) to 409 in `backend/src/donations/handlers/simulateDonation.ts`
+- [ ] T086 [US7] Wire simulation Lambda and academic-only route with least-privilege IAM (including `Donations` `GetItem`) in `infra/template.yaml`
 - [ ] T087 [US7] Implement SimulationPage with confirm/reject actions and mandatory academic disclaimer in `frontend/src/pages/SimulationPage.tsx`
 
 **Checkpoint**: US7 funcional y verificable independientemente.
@@ -302,7 +302,7 @@ solo sus registros y que el acceso a un registro ajeno responde 404 sin datos.
 ### Implementation for User Story 8
 
 - [ ] T099 [US8] Implement `listByDonor` and `getById` repository methods with ownership in `backend/src/donations/repository.ts`
-- [ ] T100 [US8] Implement `listMyDonations` and `getDonation` handlers and wire routes/IAM in `backend/src/donations/handlers/listMyDonations.ts`, `backend/src/donations/handlers/getDonation.ts` and `infra/template.yaml`
+- [ ] T100 [US8] Implement `listMyDonations` and `getDonation` handlers applying the authz middleware from T054 and wire routes/IAM in `backend/src/donations/handlers/listMyDonations.ts`, `backend/src/donations/handlers/getDonation.ts` and `infra/template.yaml`
 - [ ] T101 [US8] Implement MyDonationsPage with history fields, empty state and no cross-user data in `frontend/src/pages/MyDonationsPage.tsx`
 
 **Checkpoint**: US8 funcional y verificable independientemente.
@@ -326,6 +326,8 @@ solo sus registros y que el acceso a un registro ajeno responde 404 sin datos.
 - [ ] T112 Document and verify cleanup (`sam delete`, empty S3, delete User Pool, verify no resources) in `README.md` and `evidence/cleanup.md`
 - [ ] T113 Create traceability matrix mapping CA-01.1–CA-09.2 and CA-11.1–CA-11.2 to tests/evidence in `evidence/traceability.md`
 - [ ] T114 Run security tests T01–T14 and record evidence in `evidence/security-tests.md`
+- [ ] T115 Define SPA hosting in `infra/template.yaml`: private S3 bucket, CloudFront distribution with OAC, security response headers, frontend build upload/deploy step and CORS allowed origins matching the CloudFront domain
+- [ ] T116 Configure API Gateway throttling, CloudWatch Logs retention of 14 days for all Lambda/API log groups and CloudTrail in `infra/template.yaml`
 
 ---
 

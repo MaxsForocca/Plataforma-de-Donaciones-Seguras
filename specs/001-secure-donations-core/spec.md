@@ -200,8 +200,8 @@ concurrentar la transición, y verificar el efecto en el acumulado y el aviso ac
    usa la simulación, **Then** puede pasarla a CONFIRMADA_SIMULADA o RECHAZADA_SIMULADA; la ruta
    solo existe en el entorno académico y no está disponible en ningún otro entorno.
 2. **CA-06.2** — **Given** una donación pendiente, **When** se ejecuta la primera transición válida,
-   **Then** se modifica el monto confirmado una sola vez; solicitudes repetidas o concurrentes no
-   alteran el total y una transición inválida responde HTTP 409.
+   **Then** se modifica el monto confirmado una sola vez; toda solicitud repetida, concurrente o sobre
+   un estado terminal responde HTTP 409 y no altera el total.
 3. **CA-06.3** — **Given** una donación rechazada, **When** se consultan las cifras agregadas,
    **Then** la donación no incrementa ningún total confirmado.
 4. **CA-06.4** — **Given** la interfaz de simulación, **When** el donante la utiliza, **Then** se
@@ -270,9 +270,10 @@ mismas operaciones como DONANTE y comprobar el rechazo.
   efectos.
 - El cliente envía `donorSub`, roles, grupos o un importe manipulado: el backend no los usa como
   identidad, autorización ni verdad financiera.
-- El cliente repite la clave agregando un campo extra o cambiando el orden de las claves: la huella
-  canónica del JSON completo cambia, por lo que la repetición se trata como carga distinta y responde
-  HTTP 409; el campo extra no altera la identidad ni la autorización.
+- El cliente repite la clave agregando un campo extra o cambiando un valor: la huella canónica del
+  JSON completo cambia, por lo que la repetición se trata como carga distinta y responde HTTP 409; el
+  campo extra no altera la identidad ni la autorización. Si solo cambia el orden de las claves o los
+  espacios insignificantes, la huella no cambia y se devuelve el mismo resultado.
 - La donación ya está en un estado terminal: una nueva simulación se rechaza con HTTP 409 y no altera
   el total.
 - Un usuario GESTOR o AUDITOR no completa el segundo factor: no obtiene tokens ni accede a funciones
