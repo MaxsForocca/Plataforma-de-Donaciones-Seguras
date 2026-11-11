@@ -179,8 +179,8 @@ Una función Lambda por caso de uso, con rol IAM mínimo:
 | `getProjectFn` | `Projects`: GetItem |
 | `getProjectStatsFn` | `Projects`: GetItem |
 | `createProjectFn` | `Projects`: PutItem; `AuditEvents`: PutItem |
-| `publishProjectFn` | `Projects`: UpdateItem; `AuditEvents`: PutItem |
-| `createDonationFn` | `Projects`: GetItem (lectura previa) y ConditionCheck; `Donations`: PutItem; `Idempotency`: PutItem; `AuditEvents`: PutItem |
+| `publishProjectFn` | `Projects`: GetItem (lectura previa, 404 vs 409) y UpdateItem; `AuditEvents`: PutItem |
+| `createDonationFn` | `Projects`: GetItem (lectura previa) y ConditionCheck; `Donations`: PutItem y GetItem (devolver el resultado en una repetición); `Idempotency`: PutItem y GetItem (leer el registro tras cancelarse la transacción); `AuditEvents`: PutItem |
 | `simulateDonationFn` | `Donations`: GetItem (lectura previa) y UpdateItem; `Projects`: UpdateItem; `AuditEvents`: PutItem |
 | `listMyDonationsFn` | `Donations`: Query GSI |
 | `getDonationFn` | `Donations`: GetItem |
@@ -196,7 +196,7 @@ Los detalles completos están en [data-model.md](./data-model.md).
 | `Projects` | `projectId` (S) | — | GSI `status-createdAt` (`status`, `createdAt`) | Catálogo, detalle, estadísticas, publicación |
 | `Donations` | `donationId` (S) | — | GSI `donorSub-createdAt` (`donorSub`, `createdAt`) | Historial y lectura por propietario |
 | `Idempotency` | `pk` (S) = `donorSub#createDonation#idempotencyKey` | — | TTL `expiresAt` (24 h) | Repetición segura de donaciones |
-| `AuditEvents` | `eventType` (S) | `timestamp#eventId` (S) | — | Trazabilidad y futura consulta HU-10 |
+| `AuditEvents` | `eventType` (S) | `sk` (S) = `timestamp#eventId` | — | Trazabilidad y futura consulta HU-10 |
 
 Reglas clave:
 
@@ -242,6 +242,12 @@ Decisiones de contrato:
   es la publicación mínima solicitada en la especificación.
 - Se añade `GET /v1/donations/{donationId}` para cubrir CA-07.2/T09 con ownership; un acceso ajeno
   responde 404 para no revelar existencia.
+- **MFA TOTP para todos los usuarios del User Pool.** Cognito aplica la configuración de MFA a nivel
+  de User Pool, no por grupo. Para garantizar que GESTOR y AUDITOR no obtengan tokens sin segundo
+  factor (CA-11.2) se configura `MfaConfiguration: ON` con solo `SOFTWARE_TOKEN_MFA` (sin SMS), por lo
+  que los DONANTE también deben configurar TOTP. Con MFA opcional un GESTOR sin segundo factor
+  obtendría tokens, incumpliendo CA-11.2. Alternativa descartada por complejidad: MFA por grupo
+  mediante una Lambda pre-token.
 - Error uniforme `{ code, message, requestId }`, sin detalles internos.
 - `POST /v1/donations` acepta `Idempotency-Key` UUID y compara el JSON completo canónico; los campos
   extra forman parte de la huella de idempotencia y no de la identidad.

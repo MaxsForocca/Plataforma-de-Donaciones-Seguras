@@ -215,7 +215,7 @@ repetir la misma clave con la misma y distinta carga, y probar montos inválidos
 
 ### Tests for User Story 6
 
-- [ ] T068 [P] [US6] Unit test `amountCents` is an integer 100–100000 and rejects 0, 99, 100001, decimals, numeric strings and scientific notation in `backend/test/unit/donations/amount.test.ts`
+- [ ] T068 [P] [US6] Unit test `amountCents` is an integer 100–100000 and rejects 0, 99, 100001, decimals, numeric strings and scientific notation in `backend/test/unit/donations/amount.test.ts` (scientific notation is rejected only when it arrives as a string, e.g. `"1e2"`; a numeric literal `1e2` equals the integer 100 after `JSON.parse` and is accepted, so assert both behaviours)
 - [ ] T069 [P] [US6] Unit test canonical JSON hash is stable across key order/whitespace and changes with extra fields or different values in `backend/test/unit/donations/idempotency.test.ts`
 - [ ] T070 [P] [US6] Unit test transaction outcome mapping for same key/same hash, same key/different hash and project not PUBLICADO in `backend/test/unit/donations/create.test.ts`
 - [ ] T071 [P] [US6] Contract test `POST /v1/donations` returns 201/400/401/403/404/409 with `Idempotency-Key` in `backend/test/contract/donations.create.test.ts`

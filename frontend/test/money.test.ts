@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatPen } from "../src/services/money";
+import { formatPen, percentOf } from "../src/services/money";
 
 describe("formatPen (principio III: sin aritmética de punto flotante)", () => {
   it.each([
@@ -65,5 +65,45 @@ describe("formatPen (principio III: sin aritmética de punto flotante)", () => {
     ])("%s", (_label, value) => {
       expect(() => formatPen(value as number)).toThrow(RangeError);
     });
+  });
+});
+
+describe("percentOf (avance sin punto flotante)", () => {
+  it.each([
+    [0, 100, 0],
+    [1, 100, 1],
+    [50, 100, 50],
+    [99, 100, 99],
+    [100, 100, 100],
+    [150, 100, 100],
+    [1, 3, 33],
+    [2, 3, 66],
+    [10_000, 500_000, 2],
+    [499_999, 500_000, 99],
+    [Number.MAX_SAFE_INTEGER - 1, Number.MAX_SAFE_INTEGER, 99],
+    [Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, 100],
+  ])("%i de %i → %i %%", (part, whole, expected) => {
+    expect(percentOf(part, whole)).toBe(expected);
+  });
+
+  it("redondea hacia abajo: nunca muestra 100 % antes de alcanzar la meta", () => {
+    expect(percentOf(99_999, 100_000)).toBe(99);
+  });
+
+  it("se limita a 100 aunque se supere la meta", () => {
+    expect(percentOf(1_000_000, 1)).toBe(100);
+  });
+
+  it.each([
+    ["total cero", 5, 0],
+    ["total negativo", 5, -1],
+    ["parte negativa", -1, 100],
+    ["parte decimal", 1.5, 100],
+    ["total decimal", 1, 100.5],
+    ["NaN", Number.NaN, 100],
+    ["Infinity", 1, Number.POSITIVE_INFINITY],
+    ["entero no seguro", 2 ** 53, 100],
+  ])("rechaza %s", (_label, part, whole) => {
+    expect(() => percentOf(part, whole)).toThrow(RangeError);
   });
 });

@@ -153,8 +153,12 @@ RECHAZADA_SIMULADA --cualquier transición--> 409
 | Elemento | Valor |
 |---|---|
 | Partition key (PK) | `eventType` (String) |
-| Sort key (SK) | `timestamp#eventId` (String) |
+| Sort key (SK) | `sk` (String) = `timestamp#eventId` |
 | Billing | On-demand |
+
+> El atributo de ordenación se llama `sk` y su **valor** es la concatenación `timestamp#eventId`
+> (p. ej. `2026-11-11T12:00:00.000Z#0f8fad5b-…`). Los atributos `timestamp` y `eventId` se conservan
+> además por separado.
 
 **Attributes**
 
