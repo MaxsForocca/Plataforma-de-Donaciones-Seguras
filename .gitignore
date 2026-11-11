@@ -23,6 +23,7 @@ npm-debug.log*
 Thumbs.db
 *.tmp
 *.swp
+.~lock.*#
 .idea/
 .vscode/
 

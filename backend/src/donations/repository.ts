@@ -21,7 +21,7 @@
  * `donorSub` llega del token (nunca del cuerpo); el importe, el id y el estado los fija el servidor.
  */
 import { randomUUID } from "node:crypto";
-import { GetCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, QueryCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { donationSchema, type Donation, type DonationOutcome } from "@donaciones/shared";
 import { z } from "zod";
 import { auditPutItem, buildAuditEvent } from "../audit/repository";
@@ -144,6 +144,50 @@ export function createDonationsRepository(
   }
 
   return {
+    /**
+     * Consulta las donaciones propias del donante (`donorSub`) ordenadas de más reciente a más antigua (T099).
+     * Utiliza el GSI `donorSub-createdAt`. Devuelve solo los atributos públicos (nunca `donorSub`).
+     */
+    async listByDonor(donorSub: string): Promise<Donation[]> {
+      try {
+        const output = await client.send(
+          new QueryCommand({
+            TableName: tables.donations,
+            IndexName: "donorSub-createdAt",
+            KeyConditionExpression: "#donorSub = :sub",
+            ExpressionAttributeNames: { "#donorSub": "donorSub" },
+            ExpressionAttributeValues: { ":sub": donorSub },
+            ScanIndexForward: false,
+          }),
+        );
+        const items = (output.Items ?? []) as Item[];
+        return items.map(toPublicDonation);
+      } catch (error) {
+        throw internalError(error instanceof Error ? error.name : "consulta de historial fallida");
+      }
+    },
+
+    /**
+     * Consulta una donación por su identificador asegurando que pertenezca al `donorSub` indicado (T099).
+     * Si no existe o pertenece a otro donante devuelve `undefined` (aislamiento BOLA, CA-07.2).
+     */
+    async getById(donationId: string, donorSub: string): Promise<Donation | undefined> {
+      try {
+        const read = await client.send(
+          new GetCommand({
+            TableName: tables.donations,
+            Key: { donationId },
+            ConsistentRead: true,
+          }),
+        );
+        const item = read.Item as Item | undefined;
+        if (!item || item.donorSub !== donorSub) return undefined;
+        return toPublicDonation(item);
+      } catch (error) {
+        throw internalError(error instanceof Error ? error.name : "lectura de la donación fallida");
+      }
+    },
+
     /**
      * Lee el registro crudo de una donación (`GetItem`, ConsistentRead) o `undefined`. El llamador debe
      * verificar la propiedad ANTES de usar nada de él: aquí no se valida para no distinguir un registro

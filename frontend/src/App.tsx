@@ -9,19 +9,9 @@ import { Layout } from "./components/Layout";
 import { CatalogPage } from "./pages/CatalogPage";
 import { DonationPage } from "./pages/DonationPage";
 import { LoginCallbackPage } from "./pages/LoginCallbackPage";
+import { MyDonationsPage } from "./pages/MyDonationsPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { SimulationPage } from "./pages/SimulationPage";
-
-function PagePlaceholder({ title }: { title: string }) {
-  return (
-    <section aria-labelledby="titulo-pagina">
-      <h1 id="titulo-pagina" className="text-2xl font-semibold">
-        {title}
-      </h1>
-      <p className="mt-2 text-slate-700">Esta sección se habilitará en una fase posterior.</p>
-    </section>
-  );
-}
 
 function NotFoundPage() {
   return (
@@ -49,7 +39,7 @@ export function AppRoutes() {
         <Route element={<ProtectedRoute />}>
           <Route path="donate/:projectId" element={<DonationPage />} />
           <Route path="donations/:donationId/simulate" element={<SimulationPage />} />
-          <Route path="me/donations" element={<PagePlaceholder title="Mis donaciones" />} />
+          <Route path="me/donations" element={<MyDonationsPage />} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Route>

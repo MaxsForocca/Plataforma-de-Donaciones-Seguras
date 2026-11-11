@@ -224,6 +224,8 @@ describe("Fases 7-8 (extensión): privilegio mínimo y rutas de las funciones de
     ["POST", "/v1/projects", "api/projects.write"],
     ["PATCH", "/v1/projects/{projectId}/publish", "api/projects.write"],
     ["POST", "/v1/donations", "api/donations.write"],
+    ["GET", "/v1/donations/me", "api/donations.read"],
+    ["GET", "/v1/donations/{donationId}", "api/donations.read"],
   ])("la ruta %s %s está protegida con el authorizer JWT y el scope %s", (method, path, scope) => {
     const route = functions
       .flatMap(([name]) => Object.values(template.Resources[name]!.Properties.Events ?? {}))
@@ -271,5 +273,17 @@ describe("Fase 9 (extensión): privilegio mínimo de la simulación (T086)", () 
     expect(actionsOn("SimulateDonationFunction", "ProjectsTable")).not.toContain(
       "dynamodb:PutItem",
     );
+  });
+});
+
+describe("Fase 11 (extensión): privilegio mínimo de consulta de historial (T100)", () => {
+  it("ListMyDonationsFunction: solo Query sobre el GSI donorSub-createdAt", () => {
+    expect(actionsOf("ListMyDonationsFunction")).toEqual(["dynamodb:Query"]);
+    expect(resourcesOf("ListMyDonationsFunction")[0]).toContain("/index/donorSub-createdAt");
+  });
+
+  it("GetDonationFunction: solo GetItem sobre DonationsTable", () => {
+    expect(actionsOf("GetDonationFunction")).toEqual(["dynamodb:GetItem"]);
+    expect(resourcesOf("GetDonationFunction")[0]).toContain("DonationsTable");
   });
 });

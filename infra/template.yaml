@@ -609,6 +609,17 @@ Resources:
             - Effect: Allow
               Action: dynamodb:Query
               Resource: !Sub "${DonationsTable.Arn}/index/donorSub-createdAt"
+      Events:
+        List:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /v1/donations/me
+            Method: GET
+            Auth:
+              Authorizer: CognitoJwt
+              AuthorizationScopes:
+                - api/donations.read
 
   GetDonationFunction:
     Type: AWS::Serverless::Function
@@ -631,6 +642,17 @@ Resources:
             - Effect: Allow
               Action: dynamodb:GetItem
               Resource: !GetAtt DonationsTable.Arn
+      Events:
+        Get:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /v1/donations/{donationId}
+            Method: GET
+            Auth:
+              Authorizer: CognitoJwt
+              AuthorizationScopes:
+                - api/donations.read
 
   # ---------------------------------------------------------------------------------------------
   # Hosting de la SPA (T115): bucket S3 PRIVADO + CloudFront con OAC (SigV4) y cabeceras de seguridad.

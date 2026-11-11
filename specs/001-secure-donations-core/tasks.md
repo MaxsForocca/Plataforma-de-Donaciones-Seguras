@@ -295,16 +295,16 @@ solo sus registros y que el acceso a un registro ajeno responde 404 sin datos.
 
 ### Tests for User Story 8
 
-- [ ] T095 [P] [US8] Unit test history query filters by `donorSub` and maps date, amount, project and status in `backend/test/unit/donations/history.test.ts`
-- [ ] T096 [P] [US8] Contract test `GET /v1/donations/me` and `GET /v1/donations/{donationId}` return 200/401/404 in `backend/test/contract/donations.history.test.ts`
-- [ ] T097 [P] [US8] Integration test two donors only see their own history and cross-user access returns 404 in `backend/test/integration/donations.history.test.ts`
-- [ ] T098 [P] [US8] Frontend test MyDonationsPage list, empty and error states in `frontend/test/MyDonationsPage.test.tsx`
+- [X] T095 [P] [US8] Unit test history query filters by `donorSub` and maps date, amount, project and status in `backend/test/unit/donations/history.test.ts`
+- [X] T096 [P] [US8] Contract test `GET /v1/donations/me` and `GET /v1/donations/{donationId}` return 200/401/404 in `backend/test/contract/donations.history.test.ts`
+- [X] T097 [P] [US8] Integration test two donors only see their own history and cross-user access returns 404 in `backend/test/integration/donations.history.test.ts`
+- [X] T098 [P] [US8] Frontend test MyDonationsPage list, empty and error states in `frontend/test/MyDonationsPage.test.tsx`
 
 ### Implementation for User Story 8
 
-- [ ] T099 [US8] Implement `listByDonor` and `getById` repository methods with ownership in `backend/src/donations/repository.ts`
-- [ ] T100 [US8] Implement `listMyDonations` and `getDonation` handlers applying the authz middleware from T054 and wire routes/IAM in `backend/src/donations/handlers/listMyDonations.ts`, `backend/src/donations/handlers/getDonation.ts` and `infra/template.yaml`
-- [ ] T101 [US8] Implement MyDonationsPage with history fields, empty state and no cross-user data in `frontend/src/pages/MyDonationsPage.tsx`
+- [X] T099 [US8] Implement `listByDonor` and `getById` repository methods with ownership in `backend/src/donations/repository.ts`
+- [X] T100 [US8] Implement `listMyDonations` and `getDonation` handlers applying the authz middleware from T054 and wire routes/IAM in `backend/src/donations/handlers/listMyDonations.ts`, `backend/src/donations/handlers/getDonation.ts` and `infra/template.yaml`
+- [X] T101 [US8] Implement MyDonationsPage with history fields, empty state and no cross-user data in `frontend/src/pages/MyDonationsPage.tsx`
 
 **Checkpoint**: US8 funcional y verificable independientemente.
 
