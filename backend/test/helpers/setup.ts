@@ -73,6 +73,9 @@ export interface JwtEventOptions {
   /** `false` elimina por completo el contexto del authorizer (solicitud sin token). */
   authorizer?: boolean;
   body?: unknown;
+  /** Cuerpo textual tal cual (permite JSON inválido, espacios, notación 1e2, base64…). */
+  rawBody?: string;
+  isBase64Encoded?: boolean;
   headers?: Record<string, string>;
   query?: Record<string, string>;
   pathParameters?: Record<string, string>;
@@ -107,7 +110,12 @@ export function buildJwtEvent(
 
   const method = options.method ?? "GET";
   const path = options.path ?? "/v1/projects";
-  const body = options.body === undefined ? undefined : JSON.stringify(options.body);
+  const body =
+    options.rawBody !== undefined
+      ? options.rawBody
+      : options.body === undefined
+        ? undefined
+        : JSON.stringify(options.body);
 
   return {
     version: "2.0",
@@ -118,7 +126,7 @@ export function buildJwtEvent(
     queryStringParameters: options.query,
     pathParameters: options.pathParameters,
     ...(body === undefined ? {} : { body }),
-    isBase64Encoded: false,
+    isBase64Encoded: options.isBase64Encoded ?? false,
     requestContext: {
       accountId: "000000000000",
       apiId: "testapi",

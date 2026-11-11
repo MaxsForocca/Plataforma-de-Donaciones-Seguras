@@ -70,6 +70,26 @@ sam deploy --template-file infra/template.yaml --config-file infra/samconfig.tom
 
 La ruta de simulación de donaciones existe **solo** en el stage `academic`; en otro stage no se crea.
 
+### Validar la plantilla sin AWS
+
+```bash
+pip install cfn-lint aws-sam-translator
+npm run validate:template   # cfn-lint + transformación SAM de ambos stages + invariantes de seguridad
+```
+
+### Publicar la SPA (después de desplegar la pila)
+
+El bucket de la SPA es **privado**: solo CloudFront (con OAC) puede leerlo. Con credenciales de su propia
+cuenta, el script toma las salidas de la pila, compila con ellas, sube el build e invalida la caché:
+
+```bash
+npm run deploy:frontend -- --stage academic            # muestra el plan; no ejecuta nada
+npm run deploy:frontend -- --stage academic --execute  # ejecuta el plan
+```
+
+Limitación: con el certificado por defecto de CloudFront no se puede fijar TLS 1.2 como mínimo (exige un
+dominio propio con certificado de ACM; fuera del alcance académico).
+
 ## Limitaciones conocidas
 
 - Solo donaciones simuladas; sin pasarelas de pago ni cumplimiento PCI DSS o tributario.

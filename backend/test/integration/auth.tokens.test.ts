@@ -332,6 +332,9 @@ describe("T046: configuración de Cognito y del authorizer (estática)", () => {
     it("los scopes de cada ruta protegida coinciden con los de la política del backend", () => {
       const byRoute: Record<string, string> = {
         "POST /v1/donations/{donationId}/simulate": ACTIONS["donation:simulate"].scope,
+        "POST /v1/projects": ACTIONS["project:create"].scope,
+        "PATCH /v1/projects/{projectId}/publish": ACTIONS["project:publish"].scope,
+        "POST /v1/donations": ACTIONS["donation:create"].scope,
       };
       for (const route of allRoutes().filter((r) => r.auth !== undefined)) {
         const expected = byRoute[`${route.method} ${route.path}`];

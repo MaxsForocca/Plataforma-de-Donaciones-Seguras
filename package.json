@@ -22,7 +22,9 @@
     "build": "npm run build --workspaces --if-present",
     "check-deps": "node scripts/check-deps.mjs",
     "seed": "tsx scripts/seed.ts",
-    "test:scripts": "vitest run --config scripts/vitest.config.ts"
+    "test:scripts": "vitest run --config scripts/vitest.config.ts",
+    "deploy:frontend": "tsx scripts/deploy-frontend.ts",
+    "validate:template": "python scripts/validate-template.py"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatPen, percentOf } from "../src/services/money";
+import { formatPen, parsePenToCents, percentOf } from "../src/services/money";
 
 describe("formatPen (principio III: sin aritmética de punto flotante)", () => {
   it.each([
@@ -105,5 +105,87 @@ describe("percentOf (avance sin punto flotante)", () => {
     ["entero no seguro", 2 ** 53, 100],
   ])("rechaza %s", (_label, part, whole) => {
     expect(() => percentOf(part, whole)).toThrow(RangeError);
+  });
+});
+
+describe("parsePenToCents (entrada del usuario → céntimos enteros, sin punto flotante)", () => {
+  it.each([
+    ["0", 0],
+    ["0.01", 1],
+    ["0.5", 50],
+    ["1", 100],
+    ["1.0", 100],
+    ["1.00", 100],
+    ["1.5", 150],
+    ["25.50", 2550],
+    ["25.05", 2505],
+    ["999.99", 99_999],
+    ["1000", 100_000],
+    ["1000.00", 100_000],
+    ["1,000", 100_000],
+    ["1,000.00", 100_000],
+    ["12,345.67", 1_234_567],
+    ["S/ 25.50", 2550],
+    ["s/25.5", 2550],
+    ["S/. 10", 1000],
+    ["  12.5  ", 1250],
+    ["100000", 10_000_000],
+  ])("%j → %i céntimos", (input, expected) => {
+    expect(parsePenToCents(input)).toBe(expected);
+  });
+
+  it("evita los errores clásicos del punto flotante (0.1 + 0.2, 1.005, 19.99 * 100)", () => {
+    expect(parsePenToCents("0.30")).toBe(30);
+    expect(parsePenToCents("19.99")).toBe(1999); // 19.99 * 100 = 1998.9999999999998 en float
+    expect(parsePenToCents("1.15")).toBe(115); // 1.15 * 100 = 114.99999999999999 en float
+    expect(parsePenToCents("4.35")).toBe(435); // 4.35 * 100 = 434.99999999999994 en float
+  });
+
+  it.each([
+    ["vacío", ""],
+    ["solo espacios", "   "],
+    ["solo el símbolo", "S/"],
+    ["texto", "abc"],
+    ["texto con número", "12abc"],
+    ["negativo", "-5"],
+    ["con signo +", "+5"],
+    ["coma decimal", "25,50"],
+    ["más de 2 decimales", "12.345"],
+    ["punto final", "5."],
+    ["sin parte entera", ".5"],
+    ["notación científica", "1e2"],
+    ["notación científica con decimales", "1.5e2"],
+    ["hexadecimal", "0x10"],
+    ["ceros a la izquierda", "007.50"],
+    ["agrupación de miles incorrecta", "1,00"],
+    ["agrupación con 4 dígitos", "1,0000"],
+    ["dos puntos", "1.2.3"],
+    ["espacio interno", "1 000"],
+    ["dígitos no ASCII (árabe)", "٥"],
+    ["dígitos de ancho completo", "５"],
+    ["infinito", "Infinity"],
+    ["NaN", "NaN"],
+    ["moneda distinta", "$ 5.00"],
+    ["símbolo al final", "5 S/"],
+  ])("rechaza %s (%j) → null", (_label, input) => {
+    expect(parsePenToCents(input)).toBeNull();
+  });
+
+  it("rechaza lo que no es texto", () => {
+    for (const value of [null, undefined, 25, 25.5, {}, [], true]) {
+      expect(parsePenToCents(value as never)).toBeNull();
+    }
+  });
+
+  it("rechaza importes que no caben en un entero seguro (no pierde precisión)", () => {
+    expect(parsePenToCents("90071992547409.92")).toBeNull();
+    expect(parsePenToCents("999999999999999999999")).toBeNull();
+    expect(parsePenToCents("90071992547409.91")).toBe(Number.MAX_SAFE_INTEGER);
+  });
+
+  it("es el inverso de formatPen para importes válidos", () => {
+    for (const cents of [100, 101, 1050, 99_999, 100_000]) {
+      expect(parsePenToCents(formatPen(cents))).toBe(cents);
+    }
   });
 });

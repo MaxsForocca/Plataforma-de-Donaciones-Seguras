@@ -191,15 +191,15 @@ verificar PUBLICADO y visible; intentar como DONANTE y verificar 401/403; public
 
 ### Tests for User Story 9
 
-- [ ] T061 [P] [US9] Unit test project validation for `title` 1–120, `description` 1–2000, `goalAmountCents` entero > 0 and initial `BORRADOR` in `backend/test/unit/projects/create.test.ts`
-- [ ] T062 [P] [US9] Contract test `POST /v1/projects` returns 201/400/401/403 and a BORRADOR project in `backend/test/contract/projects.create.test.ts`
-- [ ] T063 [P] [US9] Contract test `PATCH /v1/projects/{projectId}/publish` returns 200/404/409 in `backend/test/contract/projects.publish.test.ts`
-- [ ] T064 [P] [US9] Integration test GESTOR create/publish, DONANTE 403, already-published 409 and audit events in `backend/test/integration/projects.manage.test.ts`
+- [X] T061 [P] [US9] Unit test project validation for `title` 1–120, `description` 1–2000, `goalAmountCents` entero > 0 and initial `BORRADOR` in `backend/test/unit/projects/create.test.ts`
+- [X] T062 [P] [US9] Contract test `POST /v1/projects` returns 201/400/401/403 and a BORRADOR project in `backend/test/contract/projects.create.test.ts`
+- [X] T063 [P] [US9] Contract test `PATCH /v1/projects/{projectId}/publish` returns 200/404/409 in `backend/test/contract/projects.publish.test.ts`
+- [X] T064 [P] [US9] Integration test GESTOR create/publish, DONANTE 403, already-published 409 and audit events in `backend/test/integration/projects.manage.test.ts`
 
 ### Implementation for User Story 9
 
-- [ ] T066 [US9] Implement project create/publish repository with conditional writes and audit transaction in `backend/src/projects/repository.ts`
-- [ ] T067 [US9] Implement `createProject` and `publishProject` handlers applying the authz middleware from T054 and wire Lambda/IAM permissions in `backend/src/projects/handlers/createProject.ts`, `backend/src/projects/handlers/publishProject.ts` and `infra/template.yaml`
+- [X] T066 [US9] Implement project create/publish repository with conditional writes and audit transaction in `backend/src/projects/repository.ts`
+- [X] T067 [US9] Implement `createProject` and `publishProject` handlers applying the authz middleware from T054 and wire Lambda/IAM permissions in `backend/src/projects/handlers/createProject.ts`, `backend/src/projects/handlers/publishProject.ts` and `infra/template.yaml`
 
 **Checkpoint**: US9 funcional y verificable independientemente.
 
@@ -215,19 +215,19 @@ repetir la misma clave con la misma y distinta carga, y probar montos inválidos
 
 ### Tests for User Story 6
 
-- [ ] T068 [P] [US6] Unit test `amountCents` is an integer 100–100000 and rejects 0, 99, 100001, decimals, numeric strings and scientific notation in `backend/test/unit/donations/amount.test.ts` (scientific notation is rejected only when it arrives as a string, e.g. `"1e2"`; a numeric literal `1e2` equals the integer 100 after `JSON.parse` and is accepted, so assert both behaviours)
-- [ ] T069 [P] [US6] Unit test canonical JSON hash is stable across key order/whitespace and changes with extra fields or different values in `backend/test/unit/donations/idempotency.test.ts`
-- [ ] T070 [P] [US6] Unit test transaction outcome mapping for same key/same hash, same key/different hash and project not PUBLICADO in `backend/test/unit/donations/create.test.ts`
-- [ ] T071 [P] [US6] Contract test `POST /v1/donations` returns 201/400/401/403/404/409 with `Idempotency-Key` in `backend/test/contract/donations.create.test.ts`
-- [ ] T072 [P] [US6] Integration test idempotent replay, different-payload 409, unpublished-project 409 and no partial writes in `backend/test/integration/donations.create.test.ts`
+- [X] T068 [P] [US6] Unit test `amountCents` is an integer 100–100000 and rejects 0, 99, 100001, decimals, numeric strings and scientific notation in `backend/test/unit/donations/amount.test.ts` (scientific notation is rejected only when it arrives as a string, e.g. `"1e2"`; a numeric literal `1e2` equals the integer 100 after `JSON.parse` and is accepted, so assert both behaviours)
+- [X] T069 [P] [US6] Unit test canonical JSON hash is stable across key order/whitespace and changes with extra fields or different values in `backend/test/unit/donations/idempotency.test.ts`
+- [X] T070 [P] [US6] Unit test transaction outcome mapping for same key/same hash, same key/different hash and project not PUBLICADO in `backend/test/unit/donations/create.test.ts`
+- [X] T071 [P] [US6] Contract test `POST /v1/donations` returns 201/400/401/403/404/409 with `Idempotency-Key` in `backend/test/contract/donations.create.test.ts`
+- [X] T072 [P] [US6] Integration test idempotent replay, different-payload 409, unpublished-project 409 and no partial writes in `backend/test/integration/donations.create.test.ts`
 
 ### Implementation for User Story 6
 
-- [ ] T073 [US6] Implement donation creation repository with one `TransactWriteItems` for `Idempotency` (`attribute_not_exists(pk)`), `Donations`, `Projects` `ConditionCheck` `status = PUBLICADO` and `AuditEvents` in `backend/src/donations/repository.ts`
-- [ ] T074 [US6] Implement `createDonation` handler applying the authz middleware from T054 and deriving `donorSub` from authz; read the project with `GetItem` before the transaction and return 404 if it does not exist, then map transaction cancellations to 409 (idempotency conflict or non-PUBLICADO project) and validation failures to 400 in `backend/src/donations/handlers/createDonation.ts`
-- [ ] T075 [US6] Wire donation creation Lambda, route and least-privilege IAM permissions (including `Projects` `GetItem`) in `infra/template.yaml`
-- [ ] T076 [US6] Implement DonationPage with React Hook Form + Zod, cents conversion, UUID `Idempotency-Key` and 201/400/409 states in `frontend/src/pages/DonationPage.tsx`
-- [ ] T077 [US6] Frontend test DonationPage validation, UUID generation and error states in `frontend/test/DonationPage.test.tsx`
+- [X] T073 [US6] Implement donation creation repository with one `TransactWriteItems` for `Idempotency` (`attribute_not_exists(pk)`), `Donations`, `Projects` `ConditionCheck` `status = PUBLICADO` and `AuditEvents` in `backend/src/donations/repository.ts`
+- [X] T074 [US6] Implement `createDonation` handler applying the authz middleware from T054 and deriving `donorSub` from authz; read the project with `GetItem` before the transaction and return 404 if it does not exist, then map transaction cancellations to 409 (idempotency conflict or non-PUBLICADO project) and validation failures to 400 in `backend/src/donations/handlers/createDonation.ts`
+- [X] T075 [US6] Wire donation creation Lambda, route and least-privilege IAM permissions (including `Projects` `GetItem`) in `infra/template.yaml`
+- [X] T076 [US6] Implement DonationPage with React Hook Form + Zod, cents conversion, UUID `Idempotency-Key` and 201/400/409 states in `frontend/src/pages/DonationPage.tsx`
+- [X] T077 [US6] Frontend test DonationPage validation, UUID generation and error states in `frontend/test/DonationPage.test.tsx`
 
 **Checkpoint**: US6 funcional y verificable independientemente con datos semilla.
 
@@ -243,19 +243,19 @@ concurrentar la transición, y verificar el acumulado y el aviso académico.
 
 ### Tests for User Story 7
 
-- [ ] T078 [P] [US7] Unit test only PENDIENTE_SIMULACION transitions to CONFIRMADA_SIMULADA or RECHAZADA_SIMULADA; terminal states return conflict in `backend/test/unit/donations/simulate.test.ts`
-- [ ] T079 [P] [US7] Unit test confirmed transition increments `confirmedAmountCents` once and rejected transition does not in `backend/test/unit/donations/aggregate.test.ts`
-- [ ] T080 [P] [US7] Contract test `POST /v1/donations/{donationId}/simulate` returns 200/400/401/403/404/409 and exists only in the academic stage in `backend/test/contract/donations.simulate.test.ts`
-- [ ] T081 [P] [US7] Integration test 10 concurrent confirmations produce exactly one increment in `backend/test/integration/donations.concurrent.test.ts`
-- [ ] T082 [P] [US7] Integration test rejected donation produces zero increment and repeated transition returns 409 in `backend/test/integration/donations.rejected.test.ts`
-- [ ] T083 [P] [US7] Frontend test SimulationPage shows the exact text «Simulación académica: no se ha realizado ningún cobro» and handles 409 in `frontend/test/SimulationPage.test.tsx`
+- [X] T078 [P] [US7] Unit test only PENDIENTE_SIMULACION transitions to CONFIRMADA_SIMULADA or RECHAZADA_SIMULADA; terminal states return conflict in `backend/test/unit/donations/simulate.test.ts`
+- [X] T079 [P] [US7] Unit test confirmed transition increments `confirmedAmountCents` once and rejected transition does not in `backend/test/unit/donations/aggregate.test.ts`
+- [X] T080 [P] [US7] Contract test `POST /v1/donations/{donationId}/simulate` returns 200/400/401/403/404/409 and exists only in the academic stage in `backend/test/contract/donations.simulate.test.ts`
+- [X] T081 [P] [US7] Integration test 10 concurrent confirmations produce exactly one increment in `backend/test/integration/donations.concurrent.test.ts`
+- [X] T082 [P] [US7] Integration test rejected donation produces zero increment and repeated transition returns 409 in `backend/test/integration/donations.rejected.test.ts`
+- [X] T083 [P] [US7] Frontend test SimulationPage shows the exact text «Simulación académica: no se ha realizado ningún cobro» and handles 409 in `frontend/test/SimulationPage.test.tsx`
 
 ### Implementation for User Story 7
 
-- [ ] T084 [US7] Implement simulation transaction in `backend/src/donations/repository.ts`: update donation with condition `status = PENDIENTE_SIMULACION` and `donorSub = :sub`, `ADD confirmedAmountCents` only on confirmation, and audit event
-- [ ] T085 [US7] Implement `simulateDonation` handler applying the authz middleware from T054; read the donation with `GetItem` before the transaction and return 404 if it does not exist or belongs to another `donorSub`, then map transaction cancellation (terminal state or race) to 409 in `backend/src/donations/handlers/simulateDonation.ts`
-- [ ] T086 [US7] Wire simulation Lambda and academic-only route with least-privilege IAM (including `Donations` `GetItem`) in `infra/template.yaml`
-- [ ] T087 [US7] Implement SimulationPage with confirm/reject actions and mandatory academic disclaimer in `frontend/src/pages/SimulationPage.tsx`
+- [X] T084 [US7] Implement simulation transaction in `backend/src/donations/repository.ts`: update donation with condition `status = PENDIENTE_SIMULACION` and `donorSub = :sub`, `ADD confirmedAmountCents` only on confirmation, and audit event
+- [X] T085 [US7] Implement `simulateDonation` handler applying the authz middleware from T054; read the donation with `GetItem` before the transaction and return 404 if it does not exist or belongs to another `donorSub`, then map transaction cancellation (terminal state or race) to 409 in `backend/src/donations/handlers/simulateDonation.ts`
+- [X] T086 [US7] Wire simulation Lambda and academic-only route with least-privilege IAM (including `Donations` `GetItem`) in `infra/template.yaml`
+- [X] T087 [US7] Implement SimulationPage with confirm/reject actions and mandatory academic disclaimer in `frontend/src/pages/SimulationPage.tsx`
 
 **Checkpoint**: US7 funcional y verificable independientemente.
 
@@ -327,8 +327,8 @@ solo sus registros y que el acceso a un registro ajeno responde 404 sin datos.
 - [ ] T112 Document and verify cleanup (`sam delete`, empty S3, delete User Pool, verify no resources) in `README.md` and `evidence/cleanup.md`
 - [ ] T113 Create traceability matrix mapping CA-01.1–CA-09.2 and CA-11.1–CA-11.2 to tests/evidence in `evidence/traceability.md`
 - [ ] T114 Run security tests T01–T14 and record evidence in `evidence/security-tests.md`
-- [ ] T115 Define SPA hosting in `infra/template.yaml`: private S3 bucket, CloudFront distribution with OAC, security response headers, frontend build upload/deploy step and CORS allowed origins matching the CloudFront domain
-- [ ] T116 Configure API Gateway throttling, CloudWatch Logs retention of 14 days for all Lambda/API log groups and CloudTrail in `infra/template.yaml`
+- [X] T115 Define SPA hosting in `infra/template.yaml`: private S3 bucket, CloudFront distribution with OAC, security response headers, frontend build upload/deploy step and CORS allowed origins matching the CloudFront domain
+- [X] T116 Configure API Gateway throttling, CloudWatch Logs retention of 14 days for all Lambda/API log groups and CloudTrail in `infra/template.yaml`
 
 ---
 

@@ -26,3 +26,22 @@ export function percentOf(part: number, whole: number): number {
   const percent = (BigInt(part) * 100n) / BigInt(whole);
   return percent > 100n ? 100 : Number(percent);
 }
+
+const AMOUNT_PATTERN = /^(?:S\/\.?\s*)?(0|[1-9]\d*|[1-9]\d{0,2}(?:,\d{3})+)(?:\.(\d{1,2}))?$/i;
+
+/**
+ * Convierte el texto que escribe el usuario (`"25.50"`, `"S/ 25.5"`, `"1,000.00"`) en céntimos enteros,
+ * con aritmética de texto/BigInt: jamás pasa por `parseFloat` ni multiplica un decimal (19.99 * 100
+ * daría 1998.9999999999998). Devuelve `null` si el formato no es válido: coma decimal, más de 2
+ * decimales, notación científica, signos, ceros a la izquierda, dígitos no ASCII o un valor que no
+ * cabe en un entero seguro. No valida el rango de una donación (eso lo hace el formulario).
+ */
+export function parsePenToCents(input: string): number | null {
+  if (typeof input !== "string") return null;
+  const match = AMOUNT_PATTERN.exec(input.trim());
+  if (!match) return null;
+  const whole = (match[1] ?? "").replaceAll(",", "");
+  const fraction = (match[2] ?? "").padEnd(2, "0");
+  const cents = BigInt(whole) * 100n + BigInt(fraction);
+  return cents > BigInt(Number.MAX_SAFE_INTEGER) ? null : Number(cents);
+}

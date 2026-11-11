@@ -7,7 +7,9 @@ import { Link, Route, Routes } from "react-router";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { Layout } from "./components/Layout";
 import { CatalogPage } from "./pages/CatalogPage";
+import { DonationPage } from "./pages/DonationPage";
 import { LoginCallbackPage } from "./pages/LoginCallbackPage";
+import { SimulationPage } from "./pages/SimulationPage";
 
 function PagePlaceholder({ title }: { title: string }) {
   return (
@@ -47,11 +49,8 @@ export function AppRoutes() {
         />
         <Route path="callback" element={<LoginCallbackPage />} />
         <Route element={<ProtectedRoute />}>
-          <Route path="donate/:projectId" element={<PagePlaceholder title="Donar" />} />
-          <Route
-            path="donations/:donationId/simulate"
-            element={<PagePlaceholder title="Simulación de donación" />}
-          />
+          <Route path="donate/:projectId" element={<DonationPage />} />
+          <Route path="donations/:donationId/simulate" element={<SimulationPage />} />
           <Route path="me/donations" element={<PagePlaceholder title="Mis donaciones" />} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />

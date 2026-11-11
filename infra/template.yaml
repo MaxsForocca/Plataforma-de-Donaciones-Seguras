@@ -50,7 +50,11 @@ Globals:
         AUDIT_TABLE: !Ref AuditEventsTable
         COGNITO_ISSUER: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}"
         COGNITO_CLIENT_ID: !Ref UserPoolClient
-        ALLOWED_ORIGINS: !Join [",", !Ref AllowedOrigins]
+        ALLOWED_ORIGINS:
+          !Join [
+            ",",
+            [!Join [",", !Ref AllowedOrigins], !Sub "https://${SpaDistribution.DomainName}"],
+          ]
 
 Resources:
   # ---------------------------------------------------------------------------------------------
@@ -217,8 +221,22 @@ Resources:
         - api/donations.write
         - api/donations.read
         - api/audit.read
-      CallbackURLs: !Ref CallbackUrls
-      LogoutURLs: !Ref LogoutUrls
+      CallbackURLs:
+        !Split [
+          ",",
+          !Join [
+            ",",
+            [!Join [",", !Ref CallbackUrls], !Sub "https://${SpaDistribution.DomainName}/callback"],
+          ],
+        ]
+      LogoutURLs:
+        !Split [
+          ",",
+          !Join [
+            ",",
+            [!Join [",", !Ref LogoutUrls], !Sub "https://${SpaDistribution.DomainName}/"],
+          ],
+        ]
       SupportedIdentityProviders:
         - COGNITO
       ExplicitAuthFlows:
@@ -274,8 +292,23 @@ Resources:
     Type: AWS::Serverless::HttpApi
     Properties:
       StageName: !Ref Stage
+      # Límite por defecto de todas las rutas del stage (T116): frena abusos y fuerza bruta.
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 20
+        ThrottlingRateLimit: 10
+      # Registro de acceso SIN datos personales ni tokens (sin IP, sin cabeceras, sin claims).
+      AccessLogSettings:
+        DestinationArn: !GetAtt ApiAccessLogGroup.Arn
+        Format: '{"requestId":"$context.requestId","routeKey":"$context.routeKey","status":"$context.status","responseLatency":"$context.responseLatency","integrationStatus":"$context.integrationStatus"}'
       CorsConfiguration:
-        AllowOrigins: !Ref AllowedOrigins
+        AllowOrigins:
+          !Split [
+            ",",
+            !Join [
+              ",",
+              [!Join [",", !Ref AllowedOrigins], !Sub "https://${SpaDistribution.DomainName}"],
+            ],
+          ]
         AllowMethods:
           - GET
           - POST
@@ -315,6 +348,8 @@ Resources:
           - src/projects/handlers/listProjects.ts
     Properties:
       Handler: listProjects.handler
+      LoggingConfig:
+        LogGroup: !Ref ListProjectsLogGroup
       Description: GET /v1/projects (público)
       Policies:
         - Statement:
@@ -342,6 +377,8 @@ Resources:
           - src/projects/handlers/getProject.ts
     Properties:
       Handler: getProject.handler
+      LoggingConfig:
+        LogGroup: !Ref GetProjectLogGroup
       Description: GET /v1/projects/{projectId} (público)
       Policies:
         - Statement:
@@ -362,6 +399,8 @@ Resources:
           - src/projects/handlers/getProjectStats.ts
     Properties:
       Handler: getProjectStats.handler
+      LoggingConfig:
+        LogGroup: !Ref GetProjectStatsLogGroup
       Description: GET /v1/projects/{projectId}/stats (público)
       Policies:
         - Statement:
@@ -389,7 +428,20 @@ Resources:
           - src/projects/handlers/createProject.ts
     Properties:
       Handler: createProject.handler
+      LoggingConfig:
+        LogGroup: !Ref CreateProjectLogGroup
       Description: POST /v1/projects (GESTOR, scope api/projects.write)
+      Events:
+        Create:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /v1/projects
+            Method: POST
+            Auth:
+              Authorizer: CognitoJwt
+              AuthorizationScopes:
+                - api/projects.write
       Policies:
         - Statement:
             - Effect: Allow
@@ -411,7 +463,20 @@ Resources:
           - src/projects/handlers/publishProject.ts
     Properties:
       Handler: publishProject.handler
+      LoggingConfig:
+        LogGroup: !Ref PublishProjectLogGroup
       Description: PATCH /v1/projects/{projectId}/publish (GESTOR, scope api/projects.write)
+      Events:
+        Publish:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /v1/projects/{projectId}/publish
+            Method: PATCH
+            Auth:
+              Authorizer: CognitoJwt
+              AuthorizationScopes:
+                - api/projects.write
       Policies:
         - Statement:
             - Effect: Allow
@@ -436,7 +501,20 @@ Resources:
           - src/donations/handlers/createDonation.ts
     Properties:
       Handler: createDonation.handler
+      LoggingConfig:
+        LogGroup: !Ref CreateDonationLogGroup
       Description: POST /v1/donations (DONANTE, scope api/donations.write)
+      Events:
+        Create:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /v1/donations
+            Method: POST
+            Auth:
+              Authorizer: CognitoJwt
+              AuthorizationScopes:
+                - api/donations.write
       Policies:
         - Statement:
             # Lectura previa del proyecto (404) y condición dentro de la transacción (409).
@@ -475,6 +553,8 @@ Resources:
           - src/donations/handlers/simulateDonation.ts
     Properties:
       Handler: simulateDonation.handler
+      LoggingConfig:
+        LogGroup: !Ref SimulateDonationLogGroup
       Description: POST /v1/donations/{donationId}/simulate (DONANTE propietario; solo stage academic)
       Policies:
         - Statement:
@@ -514,6 +594,8 @@ Resources:
           - src/donations/handlers/listMyDonations.ts
     Properties:
       Handler: listMyDonations.handler
+      LoggingConfig:
+        LogGroup: !Ref ListMyDonationsLogGroup
       Description: GET /v1/donations/me (DONANTE, scope api/donations.read)
       Policies:
         - Statement:
@@ -534,12 +616,288 @@ Resources:
           - src/donations/handlers/getDonation.ts
     Properties:
       Handler: getDonation.handler
+      LoggingConfig:
+        LogGroup: !Ref GetDonationLogGroup
       Description: GET /v1/donations/{donationId} (DONANTE propietario, scope api/donations.read)
       Policies:
         - Statement:
             - Effect: Allow
               Action: dynamodb:GetItem
               Resource: !GetAtt DonationsTable.Arn
+
+  # ---------------------------------------------------------------------------------------------
+  # Hosting de la SPA (T115): bucket S3 PRIVADO + CloudFront con OAC (SigV4) y cabeceras de seguridad.
+  # Nada se sirve desde S3 directamente: solo la distribución puede leer los objetos.
+  # ---------------------------------------------------------------------------------------------
+  SpaBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: AbortIncompleteUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+
+  SpaBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SpaBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontRead
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${SpaBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                "AWS:SourceArn": !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${SpaDistribution}"
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt SpaBucket.Arn
+              - !Sub "${SpaBucket.Arn}/*"
+            Condition:
+              Bool:
+                "aws:SecureTransport": "false"
+
+  SpaOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "secure-donations-${Stage}-${AWS::AccountId}-oac"
+        Description: Acceso de CloudFront al bucket privado de la SPA
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # CSP: la API se permite por comodín de subdominio (`*.execute-api`) porque su URL exacta crearía una
+  # dependencia circular (la API necesita el dominio de CloudFront para CORS). El resto es exacto.
+  SpaResponseHeadersPolicy:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub "secure-donations-${Stage}-${AWS::AccountId}-security-headers"
+        Comment: Cabeceras de seguridad de la SPA
+        SecurityHeadersConfig:
+          StrictTransportSecurity:
+            AccessControlMaxAgeSec: 63072000
+            IncludeSubdomains: true
+            Preload: false
+            Override: true
+          ContentTypeOptions:
+            Override: true
+          ReferrerPolicy:
+            ReferrerPolicy: strict-origin-when-cross-origin
+            Override: true
+          FrameOptions:
+            FrameOption: DENY
+            Override: true
+          ContentSecurityPolicy:
+            ContentSecurityPolicy: !Sub "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.execute-api.${AWS::Region}.amazonaws.com https://cognito-idp.${AWS::Region}.amazonaws.com https://${UserPoolDomain}.auth.${AWS::Region}.amazoncognito.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+            Override: true
+        CustomHeadersConfig:
+          Items:
+            - Header: Permissions-Policy
+              Value: camera=(), microphone=(), geolocation=(), payment=()
+              Override: true
+            - Header: Cross-Origin-Opener-Policy
+              Value: same-origin
+              Override: true
+
+  SpaDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub "secure-donations-${Stage} SPA"
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: spa-s3
+            DomainName: !GetAtt SpaBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt SpaOriginAccessControl.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        DefaultCacheBehavior:
+          TargetOriginId: spa-s3
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+          CachedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # CachingOptimized (gestionada por AWS)
+          ResponseHeadersPolicyId: !Ref SpaResponseHeadersPolicy
+        # Enrutamiento de la SPA: S3 con OAC responde 403 a las claves inexistentes.
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+        # Con el certificado por defecto de CloudFront la versión mínima de TLS no es configurable
+        # (TLS 1.2 exige un dominio propio con certificado de ACM; fuera del alcance académico).
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
+  # ---------------------------------------------------------------------------------------------
+  # Observabilidad (T116): registros con retención de 14 días, registro de acceso de la API sin datos
+  # personales y CloudTrail (eventos de administración) en un bucket privado.
+  # ---------------------------------------------------------------------------------------------
+  ApiAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/http-api/secure-donations-${Stage}-access"
+      RetentionInDays: 14
+
+  ListProjectsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/secure-donations-${Stage}-listProjects"
+      RetentionInDays: 14
+
+  GetProjectLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/secure-donations-${Stage}-getProject"
+      RetentionInDays: 14
+
+  GetProjectStatsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/secure-donations-${Stage}-getProjectStats"
+      RetentionInDays: 14
+
+  CreateProjectLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/secure-donations-${Stage}-createProject"
+      RetentionInDays: 14
+
+  PublishProjectLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/secure-donations-${Stage}-publishProject"
+      RetentionInDays: 14
+
+  CreateDonationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/secure-donations-${Stage}-createDonation"
+      RetentionInDays: 14
+
+  SimulateDonationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: IsAcademicStage
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/secure-donations-${Stage}-simulateDonation"
+      RetentionInDays: 14
+
+  ListMyDonationsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/secure-donations-${Stage}-listMyDonations"
+      RetentionInDays: 14
+
+  GetDonationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/secure-donations-${Stage}-getDonation"
+      RetentionInDays: 14
+
+  TrailBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireAuditLogs
+            Status: Enabled
+            ExpirationInDays: 90
+
+  TrailBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref TrailBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AWSCloudTrailAclCheck
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:GetBucketAcl
+            Resource: !GetAtt TrailBucket.Arn
+            Condition:
+              StringEquals:
+                "AWS:SourceArn": !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/secure-donations-${Stage}-trail"
+          - Sid: AWSCloudTrailWrite
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Sub "${TrailBucket.Arn}/AWSLogs/${AWS::AccountId}/*"
+            Condition:
+              StringEquals:
+                "s3:x-amz-acl": bucket-owner-full-control
+                "AWS:SourceArn": !Sub "arn:${AWS::Partition}:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/secure-donations-${Stage}-trail"
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt TrailBucket.Arn
+              - !Sub "${TrailBucket.Arn}/*"
+            Condition:
+              Bool:
+                "aws:SecureTransport": "false"
+
+  Trail:
+    Type: AWS::CloudTrail::Trail
+    DependsOn: TrailBucketPolicy
+    Properties:
+      TrailName: !Sub "secure-donations-${Stage}-trail"
+      S3BucketName: !Ref TrailBucket
+      IsLogging: true
+      EnableLogFileValidation: true
+      IncludeGlobalServiceEvents: true
+      IsMultiRegionTrail: false
 
 Outputs:
   Stage:
@@ -566,3 +924,12 @@ Outputs:
   SimulationRouteEnabled:
     Description: Indica si la ruta de simulación académica existe en este stage
     Value: !If [IsAcademicStage, "true", "false"]
+  SpaBucketName:
+    Description: Bucket privado de la SPA (destino de `aws s3 sync`)
+    Value: !Ref SpaBucket
+  SpaDistributionId:
+    Description: ID de la distribución de CloudFront (para invalidar la caché)
+    Value: !Ref SpaDistribution
+  SpaUrl:
+    Description: URL pública de la SPA
+    Value: !Sub "https://${SpaDistribution.DomainName}"

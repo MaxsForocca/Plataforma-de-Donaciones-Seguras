@@ -168,3 +168,101 @@ describe("T042: rutas públicas del catálogo", () => {
     }
   });
 });
+
+describe("Fases 7-8 (extensión): privilegio mínimo y rutas de las funciones de escritura", () => {
+  const sorted = (values: string[]) => [...values].sort();
+
+  it("CreateProjectFunction: solo PutItem sobre Projects y AuditEvents", () => {
+    expect(sorted(actionsOf("CreateProjectFunction"))).toEqual(
+      ["dynamodb:PutItem", "dynamodb:PutItem"].slice(0, 1),
+    );
+    expect(resourcesOf("CreateProjectFunction").join(" ")).not.toMatch(/Donations|Idempotency/);
+  });
+
+  it("PublishProjectFunction: GetItem y UpdateItem sobre Projects, PutItem sobre AuditEvents; sin Delete ni Scan", () => {
+    expect(sorted(actionsOf("PublishProjectFunction"))).toEqual([
+      "dynamodb:GetItem",
+      "dynamodb:PutItem",
+      "dynamodb:UpdateItem",
+    ]);
+    expect(actionsOf("PublishProjectFunction").join(" ")).not.toMatch(/Delete|Scan|Query|Batch/);
+    expect(resourcesOf("PublishProjectFunction").join(" ")).not.toMatch(/Donations|Idempotency/);
+  });
+
+  it("CreateDonationFunction: no puede modificar ni borrar proyectos ni leer el historial de otros", () => {
+    const statements = statementsOf("CreateDonationFunction");
+    const projectsActions = statements
+      .filter((s) => asList(s.Resource).join(" ").includes("ProjectsTable"))
+      .flatMap((s) => asList(s.Action));
+    expect(sorted(projectsActions)).toEqual(["dynamodb:ConditionCheckItem", "dynamodb:GetItem"]);
+    const all = actionsOf("CreateDonationFunction").join(" ");
+    expect(all).not.toMatch(/UpdateItem|Delete|Scan|Query|Batch/);
+  });
+
+  it("CreateDonationFunction escribe donaciones, idempotencia y auditoría, y nada más", () => {
+    const tables = new Set(
+      statementsOf("CreateDonationFunction").flatMap((s) =>
+        asList(s.Resource).map((r) => String(r).replace(/\$\{|\}|\.Arn/g, "")),
+      ),
+    );
+    expect([...tables].sort()).toEqual([
+      "AuditEventsTable",
+      "DonationsTable",
+      "IdempotencyTable",
+      "ProjectsTable",
+    ]);
+  });
+
+  it.each([
+    ["POST", "/v1/projects", "api/projects.write"],
+    ["PATCH", "/v1/projects/{projectId}/publish", "api/projects.write"],
+    ["POST", "/v1/donations", "api/donations.write"],
+  ])("la ruta %s %s está protegida con el authorizer JWT y el scope %s", (method, path, scope) => {
+    const route = functions
+      .flatMap(([name]) => Object.values(template.Resources[name]!.Properties.Events ?? {}))
+      .map((event) => event.Properties)
+      .find((props) => props.Method === method && props.Path === path);
+    expect(route, `falta la ruta ${method} ${path}`).toBeDefined();
+    expect(route!.Auth).toEqual({ Authorizer: "CognitoJwt", AuthorizationScopes: [scope] });
+  });
+});
+
+describe("Fase 9 (extensión): privilegio mínimo de la simulación (T086)", () => {
+  const sorted = (values: string[]) => [...values].sort();
+  const actionsOn = (name: string, table: string) =>
+    statementsOf(name)
+      .filter((s) => asList(s.Resource).join(" ").includes(table))
+      .flatMap((s) => asList(s.Action));
+
+  it("Donations: solo GetItem (lectura previa) y UpdateItem (transición)", () => {
+    expect(sorted(actionsOn("SimulateDonationFunction", "DonationsTable"))).toEqual([
+      "dynamodb:GetItem",
+      "dynamodb:UpdateItem",
+    ]);
+  });
+
+  it("Projects: solo UpdateItem (ADD del acumulado): no lee ni crea ni borra proyectos", () => {
+    expect(actionsOn("SimulateDonationFunction", "ProjectsTable")).toEqual(["dynamodb:UpdateItem"]);
+  });
+
+  it("AuditEvents: solo PutItem; no toca Idempotency", () => {
+    expect(actionsOn("SimulateDonationFunction", "AuditEventsTable")).toEqual(["dynamodb:PutItem"]);
+    expect(resourcesOf("SimulateDonationFunction").join(" ")).not.toMatch(/IdempotencyTable/);
+  });
+
+  it("sin Delete, Scan, Query, Batch, ConditionCheck ni comodines", () => {
+    expect(actionsOf("SimulateDonationFunction").join(" ")).not.toMatch(
+      /Delete|Scan|Query|Batch|ConditionCheck|\*/,
+    );
+    expect(resourcesOf("SimulateDonationFunction").join(" ")).not.toContain("*");
+  });
+
+  it("no puede crear donaciones ni proyectos (sin PutItem sobre Donations ni Projects)", () => {
+    expect(actionsOn("SimulateDonationFunction", "DonationsTable")).not.toContain(
+      "dynamodb:PutItem",
+    );
+    expect(actionsOn("SimulateDonationFunction", "ProjectsTable")).not.toContain(
+      "dynamodb:PutItem",
+    );
+  });
+});

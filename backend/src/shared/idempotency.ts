@@ -12,6 +12,7 @@ import { timingSafeEqual } from "node:crypto";
 import { payloadHash } from "@donaciones/shared/canonical";
 import { idempotencyKeySchema } from "@donaciones/shared";
 import type { TransactItem } from "./dynamodb";
+import { badRequest } from "./http";
 
 export const IDEMPOTENCY_OPERATION = "createDonation" as const;
 export const IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60;
@@ -106,4 +107,24 @@ export function decideIdempotency(
     };
   }
   return { kind: "conflict" };
+}
+
+/**
+ * Lee `Idempotency-Key` de las cabeceras (sin distinguir mayúsculas en el nombre). Ausente → 400
+ * MISSING_IDEMPOTENCY_KEY; con formato distinto de UUID → 400. Se normaliza a minúsculas para que
+ * el mismo UUID en mayúsculas o minúsculas sea la misma clave. Solo se admite la cabecera: la clave
+ * enviada en el cuerpo o la query se ignora.
+ */
+export function readIdempotencyKey(
+  headers: Record<string, string | undefined> | null | undefined,
+): string {
+  let raw: string | undefined;
+  for (const [name, value] of Object.entries(headers ?? {})) {
+    if (name.toLowerCase() === "idempotency-key") raw = value;
+  }
+  if (raw === undefined || raw === "") throw badRequest("MISSING_IDEMPOTENCY_KEY", "sin clave");
+  if (!idempotencyKeySchema.safeParse(raw).success) {
+    throw badRequest("INVALID_REQUEST", "clave con formato inválido");
+  }
+  return raw.toLowerCase();
 }

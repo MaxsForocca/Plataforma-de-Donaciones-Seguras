@@ -4,29 +4,12 @@
  * La ruta es pública: no envía el access token. La respuesta se valida con el esquema compartido y
  * se rechaza completa si algún proyecto es inválido (importes no enteros, campos de donantes, etc.).
  */
-import { projectSummarySchema } from "@donaciones/shared";
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { z } from "zod";
-import { ApiError } from "../services/apiClient";
 import { formatPen, percentOf } from "../services/money";
-import { useApiClient } from "../services/useApiClient";
-
-const projectListSchema = z.array(projectSummarySchema);
+import { useProjects } from "../services/useProjects";
 
 export function CatalogPage() {
-  const api = useApiClient();
-  const query = useQuery({
-    queryKey: ["projects"],
-    queryFn: async ({ signal }) => {
-      const payload = await api.get<unknown>("/v1/projects", { signal });
-      const parsed = projectListSchema.safeParse(payload);
-      if (!parsed.success) {
-        throw new ApiError(502, "INVALID_RESPONSE", "La respuesta del servidor no es válida.");
-      }
-      return parsed.data;
-    },
-  });
+  const query = useProjects();
 
   return (
     <section aria-labelledby="titulo-catalogo">
@@ -66,7 +49,7 @@ export function CatalogPage() {
             const percent = percentOf(project.confirmedAmountCents, project.goalAmountCents);
             return (
               <li key={project.projectId} className="rounded border border-slate-300 p-4">
-                <h2 className="text-lg font-semibold">
+                <h2 id={`titulo-${project.projectId}`} className="text-lg font-semibold">
                   <Link
                     to={`/projects/${project.projectId}`}
                     className="text-blue-900 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
@@ -88,6 +71,13 @@ export function CatalogPage() {
                   aria-label={`Avance de ${project.title}`}
                 />
                 <p className="mt-1 text-sm text-slate-700">Avance: {percent} %</p>
+                <Link
+                  to={`/donate/${project.projectId}`}
+                  aria-describedby={`titulo-${project.projectId}`}
+                  className="mt-3 inline-block rounded bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+                >
+                  Donar
+                </Link>
               </li>
             );
           })}

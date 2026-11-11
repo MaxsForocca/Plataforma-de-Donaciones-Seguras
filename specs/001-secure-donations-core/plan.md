@@ -208,6 +208,15 @@ Reglas clave:
 - La creación de donación usa `TransactWriteItems` con: `Put Idempotency` condicionado a
   `attribute_not_exists(pk)`, `Put Donation` condicionado a `attribute_not_exists(donationId)`,
   `ConditionCheck Project` con `status = PUBLICADO` y `Put AuditEvent`.
+- **Reintento de `TransactionConflict` (decisión de la Fase 8).** Cuando dos transacciones tocan el
+  mismo item DynamoDB cancela una de ellas con la razón `TransactionConflict`, que no equivale a «la
+  clave ya existe». Para que «misma clave y misma carga» devuelva siempre el mismo resultado bajo
+  concurrencia, la creación (y, por la misma razón, la simulación) **reintenta la transacción hasta 5
+  veces** con espera creciente (`20 × n ms` más una variación aleatoria de hasta 20 ms; inyectable en
+  pruebas). Si los reintentos se agotan se resuelve leyendo el registro de idempotencia (replay o 409) y,
+  si tampoco existe, responde 409 CONFLICT sin efectos parciales (constitución IV: una
+  `TransactionCanceledException` responde 409). Cualquier otra razón de cancelación (`ThrottlingError`,
+  `ValidationError`, colisión de id) es un 500 uniforme.
 - Antes de transaccionar, la simulación lee la donación con `GetItem` (`ConsistentRead`): si no
   existe o su `donorSub` no coincide con el `sub` autenticado responde 404 sin abrir la transacción;
   una cancelación posterior de la transacción (estado ya terminal o carrera) responde 409.
@@ -248,6 +257,12 @@ Decisiones de contrato:
   que los DONANTE también deben configurar TOTP. Con MFA opcional un GESTOR sin segundo factor
   obtendría tokens, incumpliendo CA-11.2. Alternativa descartada por complejidad: MFA por grupo
   mediante una Lambda pre-token.
+- **`Idempotency-Key` normalizada a minúsculas (decisión de la Fase 8).** Un UUID es el mismo
+  identificador escrito en mayúsculas o en minúsculas; si no se normalizara, reenviar la misma clave con
+  otra capitalización crearía una segunda donación. La cabecera se lee sin distinguir mayúsculas en el
+  nombre, se valida como UUID (ausente → 400 `MISSING_IDEMPOTENCY_KEY`; formato inválido → 400) y se
+  convierte a minúsculas antes de componer la PK `donorSub#createDonation#key`. Solo se acepta la
+  cabecera: una clave enviada en el cuerpo o la query se ignora.
 - Error uniforme `{ code, message, requestId }`, sin detalles internos.
 - `POST /v1/donations` acepta `Idempotency-Key` UUID y compara el JSON completo canónico; los campos
   extra forman parte de la huella de idempotencia y no de la identidad.

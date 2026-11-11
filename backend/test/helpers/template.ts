@@ -13,6 +13,7 @@ const TEMPLATE_PATH = fileURLToPath(new URL("../../../infra/template.yaml", impo
 export interface TemplateResource {
   Type: string;
   Condition?: string;
+  DependsOn?: string | string[];
   Properties: Record<string, any>;
 }
 
