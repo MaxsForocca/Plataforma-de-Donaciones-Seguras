@@ -385,6 +385,13 @@ Resources:
             - Effect: Allow
               Action: dynamodb:GetItem
               Resource: !GetAtt ProjectsTable.Arn
+      Events:
+        Detail:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /v1/projects/{projectId}
+            Method: GET
 
   GetProjectStatsFunction:
     Type: AWS::Serverless::Function

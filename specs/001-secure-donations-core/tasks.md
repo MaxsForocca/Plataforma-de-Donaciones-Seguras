@@ -271,16 +271,16 @@ inexistente; verificar 200/404 y ausencia de datos de donantes.
 
 ### Tests for User Story 2
 
-- [ ] T088 [P] [US2] Unit test detail returns 404 for nonexistent or non-PUBLICADO projects and never exposes donor data in `backend/test/unit/projects/detail.test.ts`
-- [ ] T089 [P] [US2] Contract test `GET /v1/projects/{projectId}` returns 200/404 in `backend/test/contract/projects.detail.test.ts`
-- [ ] T090 [P] [US2] Integration test public detail for published, draft and nonexistent project in `backend/test/integration/projects.detail.test.ts`
-- [ ] T091 [P] [US2] Frontend test ProjectDetailPage 200/404 and no donor identifiers in `frontend/test/ProjectDetailPage.test.tsx`
+- [X] T088 [P] [US2] Unit test detail returns 404 for nonexistent or non-PUBLICADO projects and never exposes donor data in `backend/test/unit/projects/detail.test.ts`
+- [X] T089 [P] [US2] Contract test `GET /v1/projects/{projectId}` returns 200/404 in `backend/test/contract/projects.detail.test.ts`
+- [X] T090 [P] [US2] Integration test public detail for published, draft and nonexistent project in `backend/test/integration/projects.detail.test.ts`
+- [X] T091 [P] [US2] Frontend test ProjectDetailPage 200/404 and no donor identifiers in `frontend/test/ProjectDetailPage.test.tsx`
 
 ### Implementation for User Story 2
 
-- [ ] T092 [US2] Implement `getProject` repository/handler with published-only visibility in `backend/src/projects/repository.ts` and `backend/src/projects/handlers/getProject.ts`
-- [ ] T093 [US2] Wire detail route with read-only IAM permissions in `infra/template.yaml`
-- [ ] T094 [US2] Implement ProjectDetailPage with aggregate display, loading/error/404 states and no donor data in `frontend/src/pages/ProjectDetailPage.tsx`
+- [X] T092 [US2] Implement `getProject` repository/handler with published-only visibility in `backend/src/projects/repository.ts` and `backend/src/projects/handlers/getProject.ts`
+- [X] T093 [US2] Wire detail route with read-only IAM permissions in `infra/template.yaml`
+- [X] T094 [US2] Implement ProjectDetailPage with aggregate display, loading/error/404 states and no donor data in `frontend/src/pages/ProjectDetailPage.tsx`
 
 **Checkpoint**: US2 funcional y verificable independientemente.
 

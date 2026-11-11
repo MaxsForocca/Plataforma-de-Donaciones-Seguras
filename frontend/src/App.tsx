@@ -9,6 +9,7 @@ import { Layout } from "./components/Layout";
 import { CatalogPage } from "./pages/CatalogPage";
 import { DonationPage } from "./pages/DonationPage";
 import { LoginCallbackPage } from "./pages/LoginCallbackPage";
+import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { SimulationPage } from "./pages/SimulationPage";
 
 function PagePlaceholder({ title }: { title: string }) {
@@ -43,10 +44,7 @@ export function AppRoutes() {
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<CatalogPage />} />
-        <Route
-          path="projects/:projectId"
-          element={<PagePlaceholder title="Detalle del proyecto" />}
-        />
+        <Route path="projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="callback" element={<LoginCallbackPage />} />
         <Route element={<ProtectedRoute />}>
           <Route path="donate/:projectId" element={<DonationPage />} />

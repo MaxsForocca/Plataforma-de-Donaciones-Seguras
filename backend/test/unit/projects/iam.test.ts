@@ -131,6 +131,13 @@ describe("T042: rutas públicas del catálogo", () => {
     expect(routes[0]!.Auth).toBeUndefined();
   });
 
+  it("el detalle expone solo GET /v1/projects/{projectId}, sin autenticación (T093)", () => {
+    const routes = routesOf("GetProjectFunction");
+    expect(routes).toHaveLength(1);
+    expect(routes[0]).toMatchObject({ Path: "/v1/projects/{projectId}", Method: "GET" });
+    expect(routes[0]!.Auth).toBeUndefined();
+  });
+
   it("las estadísticas exponen solo GET /v1/projects/{projectId}/stats, sin autenticación", () => {
     const routes = routesOf("GetProjectStatsFunction");
     expect(routes).toHaveLength(1);
@@ -149,7 +156,7 @@ describe("T042: rutas públicas del catálogo", () => {
         .filter((route) => route.Auth === undefined)
         .map((route) => `${route.Method} ${route.Path}`),
     );
-    expect(publicRoutes.length).toBeGreaterThanOrEqual(2);
+    expect(publicRoutes.length).toBeGreaterThanOrEqual(3);
     for (const route of publicRoutes) expect(allowed.has(route)).toBe(true);
   });
 
@@ -163,7 +170,7 @@ describe("T042: rutas públicas del catálogo", () => {
   });
 
   it("las rutas públicas se enlazan a la API explícita del template", () => {
-    for (const name of ["ListProjectsFunction", "GetProjectStatsFunction"]) {
+    for (const name of ["ListProjectsFunction", "GetProjectFunction", "GetProjectStatsFunction"]) {
       for (const route of routesOf(name)) expect(route.ApiId).toBeDefined();
     }
   });
