@@ -23,6 +23,7 @@
     "check-deps": "node scripts/check-deps.mjs",
     "seed": "tsx scripts/seed.ts",
     "test:scripts": "vitest run --config scripts/vitest.config.ts",
+    "contract:validate": "tsx scripts/validate-openapi.ts",
     "deploy:frontend": "tsx scripts/deploy-frontend.ts",
     "validate:template": "python scripts/validate-template.py"
   },

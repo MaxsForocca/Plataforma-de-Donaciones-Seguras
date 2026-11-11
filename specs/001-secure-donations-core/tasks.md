@@ -314,19 +314,19 @@ solo sus registros y que el acceso a un registro ajeno responde 404 sin datos.
 
 **Purpose**: Validación end-to-end, seguridad, accesibilidad, rendimiento y documentación.
 
-- [ ] T102 Run quickstart scenarios 1–20 and record results in `evidence/quickstart-validation.md`
-- [ ] T103 Audit and fix accessibility at 375 px and WCAG 2.2 AA applicable criteria in `frontend/src/pages/` and `frontend/src/components/`; record in `evidence/accessibility.md`
-- [ ] T104 Measure 50-project catalog/detail latency (95% ≤ 1.5 s excluding cold start) and record method/tool/results in `evidence/performance.md`
-- [ ] T105 Review IAM least privilege and remove wildcards in `infra/template.yaml`; record in `evidence/iam-review.md`
-- [ ] T106 Complete structured logging coverage (`requestId`, action, result, status, duration) across handlers in `backend/src/shared/logger.ts` and `backend/src/*/handlers/`
-- [ ] T107 Write threat model and NIST SP 800-207 mapping in `docs/threat-model.md`
-- [ ] T108 Generate `docs/api.yaml` from `contracts/openapi.yaml` and validate OpenAPI 3.1 in CI
-- [ ] T109 Update README with deployment, demo, cleanup, limitations and no-real-payments warning in `README.md`
-- [ ] T110 Complete the required AI usage declaration in `AI_USAGE.md`
-- [ ] T111 Finalize CI to run lint, typecheck, unit/integration/contract tests, build, `npm audit`, dependency guard and OpenAPI validation in `.github/workflows/ci.yml`
-- [ ] T112 Document and verify cleanup (`sam delete`, empty S3, delete User Pool, verify no resources) in `README.md` and `evidence/cleanup.md`
-- [ ] T113 Create traceability matrix mapping CA-01.1–CA-09.2 and CA-11.1–CA-11.2 to tests/evidence in `evidence/traceability.md`
-- [ ] T114 Run security tests T01–T14 and record evidence in `evidence/security-tests.md`
+- [X] T102 Run quickstart scenarios 1–20 and record results in `evidence/quickstart-validation.md`
+- [X] T103 Audit and fix accessibility at 375 px and WCAG 2.2 AA applicable criteria in `frontend/src/pages/` and `frontend/src/components/`; record in `evidence/accessibility.md`
+- [X] T104 Measure 50-project catalog/detail latency (95% ≤ 1.5 s excluding cold start) and record method/tool/results in `evidence/performance.md`
+- [X] T105 Review IAM least privilege and remove wildcards in `infra/template.yaml`; record in `evidence/iam-review.md`
+- [X] T106 Complete structured logging coverage (`requestId`, action, result, status, duration) across handlers in `backend/src/shared/logger.ts` and `backend/src/*/handlers/`
+- [X] T107 Write threat model and NIST SP 800-207 mapping in `docs/threat-model.md`
+- [X] T108 Generate `docs/api.yaml` from `contracts/openapi.yaml` and validate OpenAPI 3.1 in CI
+- [X] T109 Update README with deployment, demo, cleanup, limitations and no-real-payments warning in `README.md`
+- [X] T110 Complete the required AI usage declaration in `AI_USAGE.md`
+- [X] T111 Finalize CI to run lint, typecheck, unit/integration/contract tests, build, `npm audit`, dependency guard and OpenAPI validation in `.github/workflows/ci.yml`
+- [X] T112 Document and verify cleanup (`sam delete`, empty S3, delete User Pool, verify no resources) in `README.md` and `evidence/cleanup.md`
+- [X] T113 Create traceability matrix mapping CA-01.1–CA-09.2 and CA-11.1–CA-11.2 to tests/evidence in `evidence/traceability.md`
+- [X] T114 Run security tests T01–T14 and record evidence in `evidence/security-tests.md`
 - [X] T115 Define SPA hosting in `infra/template.yaml`: private S3 bucket, CloudFront distribution with OAC, security response headers, frontend build upload/deploy step and CORS allowed origins matching the CloudFront domain
 - [X] T116 Configure API Gateway throttling, CloudWatch Logs retention of 14 days for all Lambda/API log groups and CloudTrail in `infra/template.yaml`
 

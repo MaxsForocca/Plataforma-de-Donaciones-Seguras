@@ -39,6 +39,9 @@ jobs:
       - name: Tests (unit, integration, contract)
         run: npm test
 
+      - name: OpenAPI validation
+        run: npm run contract:validate
+
       - name: Build
         run: npm run build
 
