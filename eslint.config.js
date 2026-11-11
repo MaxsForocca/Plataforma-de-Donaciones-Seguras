@@ -28,6 +28,15 @@ export default defineConfig(
     languageOptions: { globals: globals.node },
   },
   {
+    rules: {
+      // Convención: lo que empieza con "_" se ignora a propósito.
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", ignoreRestSiblings: true },
+      ],
+    },
+  },
+  {
     // Constitución, principio II: Bootstrap y Next.js están prohibidos en cualquier forma.
     rules: {
       "no-restricted-imports": [

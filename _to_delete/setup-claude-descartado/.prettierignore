@@ -1,0 +1,10 @@
+package-lock.json
+node_modules
+dist
+coverage
+.aws-sam
+.specify
+.opencode
+specs
+design.md
+requirements.md

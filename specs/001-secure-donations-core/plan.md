@@ -17,7 +17,8 @@ API Gateway HTTP API con JWT authorizer de Cognito.
 
 ## Technical Context
 
-**Language/Version**: TypeScript 7.0.x; Node.js 24 (`nodejs24.x`) en Lambda; navegadores modernos.
+**Language/Version**: TypeScript 6.0.x (`typescript-eslint` exige `typescript <6.1.0`); Node.js 24
+(`nodejs24.x`) en Lambda; navegadores modernos.
 
 **Primary Dependencies**: React 19.3 + React DOM; Vite 8.3; Tailwind CSS 4; React Router 8; React
 Hook Form 7; Zod 4; TanStack Query 5; oidc-client-ts; AWS SDK v3 para DynamoDB; AWS SAM/CloudFormation.

@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >-
+  Plataforma de Donaciones Seguras. Esqueleto SAM: parámetro Stage, convención de nombres y salidas.
+  Los recursos reales (Cognito, API Gateway, Lambda, DynamoDB, S3 y CloudFront) se agregan en la Fase 2.
+
+Parameters:
+  Stage:
+    Type: String
+    Default: academic
+    AllowedValues:
+      - academic
+      - dev
+    Description: >-
+      Entorno de despliegue. Solo en "academic" se habilita la simulación de confirmación de donaciones.
+
+Conditions:
+  IsAcademicStage: !Equals [!Ref Stage, academic]
+
+Globals:
+  Function:
+    Runtime: nodejs24.x
+    Architectures:
+      - arm64
+    Timeout: 10
+    MemorySize: 256
+    Environment:
+      Variables:
+        STAGE: !Ref Stage
+
+Resources:
+  # Marcador de pila: parámetro estándar de SSM (sin costo). Permite verificar el despliegue del
+  # esqueleto antes de agregar los recursos reales.
+  StackMarker:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub '/secure-donations/${Stage}/stack'
+      Type: String
+      Value: !Ref AWS::StackName
+      Description: Marcador de la pila de la Plataforma de Donaciones Seguras.
+
+Outputs:
+  Stage:
+    Description: Stage desplegado
+    Value: !Ref Stage
+  SimulationEnabled:
+    Description: Indica si la simulación de confirmación está habilitada en este stage
+    Value: !If [IsAcademicStage, 'true', 'false']
+  NamePrefix:
+    Description: Prefijo de nombres de recursos para este stage
+    Value: !Sub 'secure-donations-${Stage}'

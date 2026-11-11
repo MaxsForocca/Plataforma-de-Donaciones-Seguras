@@ -1,0 +1,21 @@
+version = 0.1
+
+# Stage académico: único donde está habilitada la simulación de confirmación.
+[academic.deploy.parameters]
+stack_name = "secure-donations-academic"
+region = "us-east-1"
+resolve_s3 = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "Stage=academic"
+confirm_changeset = true
+fail_on_empty_changeset = false
+
+# Stage no académico: la simulación queda deshabilitada.
+[dev.deploy.parameters]
+stack_name = "secure-donations-dev"
+region = "us-east-1"
+resolve_s3 = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "Stage=dev"
+confirm_changeset = true
+fail_on_empty_changeset = false

@@ -1,9 +1,11 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  Plataforma de Donaciones Seguras (proyecto académico, donaciones simuladas).
-  Esqueleto SAM: parámetro Stage, convención de nombres y outputs. Las tablas DynamoDB, Cognito,
-  API Gateway, funciones Lambda e IAM se añaden en T023-T027 (Fase 2).
+  Plataforma de Donaciones Seguras (proyecto académico, donaciones simuladas): tablas DynamoDB,
+  Cognito (Authorization Code + PKCE, MFA TOTP), API Gateway HTTP API con JWT authorizer y
+  funciones Lambda con IAM de privilegio mínimo. Las rutas protegidas se enlazan función por función
+  en las tareas de cada historia (T042, T067, T075, T093, T100); aquí solo existe la ruta de
+  simulación, exclusiva del stage `academic` (T027).
 
 Parameters:
   Stage:
@@ -14,7 +16,19 @@ Parameters:
       - dev
     Description: >
       Entorno de despliegue. La ruta de simulación de donaciones existe únicamente en `academic`
-      (FR-017); en cualquier otro stage no debe crearse.
+      (FR-017); en cualquier otro stage no se crea.
+  AllowedOrigins:
+    Type: CommaDelimitedList
+    Default: "http://localhost:5173"
+    Description: Orígenes exactos permitidos por CORS (sin comodines). Añadir el dominio de CloudFront (T115).
+  CallbackUrls:
+    Type: CommaDelimitedList
+    Default: "http://localhost:5173/callback"
+    Description: URIs de redirección tras el login (https, salvo localhost).
+  LogoutUrls:
+    Type: CommaDelimitedList
+    Default: "http://localhost:5173/"
+    Description: URIs de redirección tras el cierre de sesión (https, salvo localhost).
 
 Conditions:
   IsAcademicStage: !Equals [!Ref Stage, academic]
@@ -26,13 +40,492 @@ Globals:
       - arm64
     Timeout: 10
     MemorySize: 256
+    CodeUri: ../backend/
     Environment:
       Variables:
         STAGE: !Ref Stage
+        PROJECTS_TABLE: !Ref ProjectsTable
+        DONATIONS_TABLE: !Ref DonationsTable
+        IDEMPOTENCY_TABLE: !Ref IdempotencyTable
+        AUDIT_TABLE: !Ref AuditEventsTable
+        COGNITO_ISSUER: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}"
+        COGNITO_CLIENT_ID: !Ref UserPoolClient
+        ALLOWED_ORIGINS: !Join [",", !Ref AllowedOrigins]
 
-# Convención de nombres de recursos: secure-donations-<Stage>-<recurso>
-# (se aplica con !Sub "secure-donations-${Stage}-<recurso>" en T023-T026).
-Resources: {}
+Resources:
+  # ---------------------------------------------------------------------------------------------
+  # DynamoDB (T023): on-demand, cifrado en reposo administrado por AWS, importes enteros (N).
+  # Nombres físicos: <Stage>Projects, <Stage>Donations, <Stage>Idempotency, <Stage>AuditEvents.
+  # ---------------------------------------------------------------------------------------------
+  ProjectsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${Stage}Projects"
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: projectId
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: projectId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: status-createdAt
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  DonationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${Stage}Donations"
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: donationId
+          AttributeType: S
+        - AttributeName: donorSub
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: donationId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: donorSub-createdAt
+          KeySchema:
+            - AttributeName: donorSub
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: INCLUDE
+            NonKeyAttributes:
+              - projectId
+              - amountCents
+              - currency
+              - status
+              - updatedAt
+
+  IdempotencyTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${Stage}Idempotency"
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+
+  AuditEventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${Stage}AuditEvents"
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: eventType
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: eventType
+          KeyType: HASH
+        - AttributeName: sk # valor: <timestamp>#<eventId>
+          KeyType: RANGE
+
+  # ---------------------------------------------------------------------------------------------
+  # Cognito (T024): Authorization Code + PKCE (sin flujo implícito), access token de 15 min,
+  # refresh revocable y MFA TOTP (sin SMS).
+  # Limitación: Cognito aplica MFA a nivel de User Pool, no por grupo. Para garantizar que GESTOR y
+  # AUDITOR no obtengan tokens sin segundo factor (CA-11.2) se exige TOTP a todos los usuarios.
+  # ---------------------------------------------------------------------------------------------
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub "secure-donations-${Stage}-users"
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      MfaConfiguration: "ON"
+      EnabledMfas:
+        - SOFTWARE_TOKEN_MFA
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          TemporaryPasswordValidityDays: 3
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      DeletionProtection: INACTIVE
+
+  UserPoolResourceServer:
+    Type: AWS::Cognito::UserPoolResourceServer
+    Properties:
+      UserPoolId: !Ref UserPool
+      Identifier: api
+      Name: !Sub "secure-donations-${Stage}-api"
+      Scopes:
+        - ScopeName: projects.write
+          ScopeDescription: Crear y publicar proyectos (GESTOR)
+        - ScopeName: donations.write
+          ScopeDescription: Crear donaciones y simular confirmación/rechazo (DONANTE)
+        - ScopeName: donations.read
+          ScopeDescription: Consultar el historial y las donaciones propias (DONANTE)
+        - ScopeName: audit.read
+          ScopeDescription: Consultar auditoría (AUDITOR; HU-10 diferido)
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: UserPoolResourceServer
+    Properties:
+      ClientName: !Sub "secure-donations-${Stage}-spa"
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false # cliente público (SPA): PKCE en lugar de secreto
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code # solo Authorization Code; el flujo implícito no se habilita
+      AllowedOAuthScopes:
+        - openid
+        - api/projects.write
+        - api/donations.write
+        - api/donations.read
+        - api/audit.read
+      CallbackURLs: !Ref CallbackUrls
+      LogoutURLs: !Ref LogoutUrls
+      SupportedIdentityProviders:
+        - COGNITO
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      AccessTokenValidity: 15
+      IdTokenValidity: 15
+      RefreshTokenValidity: 1
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      EnableTokenRevocation: true
+      PreventUserExistenceErrors: ENABLED
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref UserPool
+      Domain: !Sub "secure-donations-${Stage}-${AWS::AccountId}"
+
+  DonanteGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      UserPoolId: !Ref UserPool
+      GroupName: DONANTE
+      Description: Donantes (donar, simular e historial propio)
+      Precedence: 30
+
+  GestorGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      UserPoolId: !Ref UserPool
+      GroupName: GESTOR
+      Description: Gestores (crear y publicar proyectos)
+      Precedence: 20
+
+  AuditorGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      UserPoolId: !Ref UserPool
+      GroupName: AUDITOR
+      Description: Auditores (consulta de auditoría; HU-10 diferido)
+      Precedence: 10
+
+  # ---------------------------------------------------------------------------------------------
+  # API Gateway HTTP API (T025). El JWT authorizer valida firma, emisor, expiración y audiencia
+  # (`client_id`). Los ID tokens también portan `aud`, por lo que TODA ruta protegida debe declarar
+  # `AuthorizationScopes`: los ID tokens no tienen scopes y quedan rechazados. No hay authorizer por
+  # defecto: cada ruta protegida lo declara explícitamente junto con sus scopes.
+  # ---------------------------------------------------------------------------------------------
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Stage
+      CorsConfiguration:
+        AllowOrigins: !Ref AllowedOrigins
+        AllowMethods:
+          - GET
+          - POST
+          - PATCH
+          - OPTIONS
+        AllowHeaders:
+          - authorization
+          - content-type
+          - idempotency-key
+        MaxAge: 600
+      Auth:
+        Authorizers:
+          CognitoJwt:
+            IdentitySource: $request.header.Authorization
+            JwtConfiguration:
+              issuer: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}"
+              audience:
+                - !Ref UserPoolClient
+
+  # ---------------------------------------------------------------------------------------------
+  # Funciones Lambda (T026): una por caso de uso, con IAM de privilegio mínimo (solo las tablas y
+  # acciones necesarias). Las lecturas previas (GetItem) permiten responder 404 antes de abrir
+  # transacciones. Los handlers los implementan T041, T067, T074, T085, T092, T100; sus rutas
+  # (`Events`) se enlazan en las tareas de cada historia.
+  # Nota de build: `sam build` (esbuild) requiere que existan los archivos de cada EntryPoint.
+  # ---------------------------------------------------------------------------------------------
+  ListProjectsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: esm
+        Target: es2023
+        OutExtension:
+          - .js=.mjs
+        EntryPoints:
+          - src/projects/handlers/listProjects.ts
+    Properties:
+      Handler: listProjects.handler
+      Description: GET /v1/projects (público)
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:Query
+              Resource: !Sub "${ProjectsTable.Arn}/index/status-createdAt"
+
+  GetProjectFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: esm
+        Target: es2023
+        OutExtension:
+          - .js=.mjs
+        EntryPoints:
+          - src/projects/handlers/getProject.ts
+    Properties:
+      Handler: getProject.handler
+      Description: GET /v1/projects/{projectId} (público)
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:GetItem
+              Resource: !GetAtt ProjectsTable.Arn
+
+  GetProjectStatsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: esm
+        Target: es2023
+        OutExtension:
+          - .js=.mjs
+        EntryPoints:
+          - src/projects/handlers/getProjectStats.ts
+    Properties:
+      Handler: getProjectStats.handler
+      Description: GET /v1/projects/{projectId}/stats (público)
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:GetItem
+              Resource: !GetAtt ProjectsTable.Arn
+
+  CreateProjectFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: esm
+        Target: es2023
+        OutExtension:
+          - .js=.mjs
+        EntryPoints:
+          - src/projects/handlers/createProject.ts
+    Properties:
+      Handler: createProject.handler
+      Description: POST /v1/projects (GESTOR, scope api/projects.write)
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:PutItem
+              Resource:
+                - !GetAtt ProjectsTable.Arn
+                - !GetAtt AuditEventsTable.Arn
+
+  PublishProjectFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: esm
+        Target: es2023
+        OutExtension:
+          - .js=.mjs
+        EntryPoints:
+          - src/projects/handlers/publishProject.ts
+    Properties:
+      Handler: publishProject.handler
+      Description: PATCH /v1/projects/{projectId}/publish (GESTOR, scope api/projects.write)
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt ProjectsTable.Arn
+            - Effect: Allow
+              Action: dynamodb:PutItem
+              Resource: !GetAtt AuditEventsTable.Arn
+
+  CreateDonationFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: esm
+        Target: es2023
+        OutExtension:
+          - .js=.mjs
+        EntryPoints:
+          - src/donations/handlers/createDonation.ts
+    Properties:
+      Handler: createDonation.handler
+      Description: POST /v1/donations (DONANTE, scope api/donations.write)
+      Policies:
+        - Statement:
+            # Lectura previa del proyecto (404) y condición dentro de la transacción (409).
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:ConditionCheckItem
+              Resource: !GetAtt ProjectsTable.Arn
+            # Escritura de la donación y lectura para devolver el resultado en una repetición.
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+              Resource: !GetAtt DonationsTable.Arn
+            # Reserva atómica de la clave y lectura del registro tras una cancelación.
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+              Resource: !GetAtt IdempotencyTable.Arn
+            - Effect: Allow
+              Action: dynamodb:PutItem
+              Resource: !GetAtt AuditEventsTable.Arn
+
+  SimulateDonationFunction:
+    Type: AWS::Serverless::Function
+    Condition: IsAcademicStage # T027: no existe fuera del stage academic
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: esm
+        Target: es2023
+        OutExtension:
+          - .js=.mjs
+        EntryPoints:
+          - src/donations/handlers/simulateDonation.ts
+    Properties:
+      Handler: simulateDonation.handler
+      Description: POST /v1/donations/{donationId}/simulate (DONANTE propietario; solo stage academic)
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt DonationsTable.Arn
+            - Effect: Allow
+              Action: dynamodb:UpdateItem
+              Resource: !GetAtt ProjectsTable.Arn
+            - Effect: Allow
+              Action: dynamodb:PutItem
+              Resource: !GetAtt AuditEventsTable.Arn
+      Events:
+        Simulate:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /v1/donations/{donationId}/simulate
+            Method: POST
+            Auth:
+              Authorizer: CognitoJwt
+              AuthorizationScopes:
+                - api/donations.write
+
+  ListMyDonationsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: esm
+        Target: es2023
+        OutExtension:
+          - .js=.mjs
+        EntryPoints:
+          - src/donations/handlers/listMyDonations.ts
+    Properties:
+      Handler: listMyDonations.handler
+      Description: GET /v1/donations/me (DONANTE, scope api/donations.read)
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:Query
+              Resource: !Sub "${DonationsTable.Arn}/index/donorSub-createdAt"
+
+  GetDonationFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Format: esm
+        Target: es2023
+        OutExtension:
+          - .js=.mjs
+        EntryPoints:
+          - src/donations/handlers/getDonation.ts
+    Properties:
+      Handler: getDonation.handler
+      Description: GET /v1/donations/{donationId} (DONANTE propietario, scope api/donations.read)
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:GetItem
+              Resource: !GetAtt DonationsTable.Arn
 
 Outputs:
   Stage:
@@ -41,6 +534,21 @@ Outputs:
   ResourcePrefix:
     Description: Prefijo de nombres de recursos para este stage
     Value: !Sub "secure-donations-${Stage}"
+  ApiUrl:
+    Description: URL base de la API (valor de VITE_API_BASE_URL)
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}"
+  UserPoolId:
+    Description: ID del User Pool de Cognito
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Description: ID del app client de la SPA (valor de VITE_OIDC_CLIENT_ID)
+    Value: !Ref UserPoolClient
+  CognitoIssuer:
+    Description: Emisor OIDC (valor de VITE_OIDC_AUTHORITY)
+    Value: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}"
+  CognitoDomain:
+    Description: Dominio del Hosted UI sin esquema (valor de VITE_OIDC_COGNITO_DOMAIN)
+    Value: !Sub "${UserPoolDomain}.auth.${AWS::Region}.amazoncognito.com"
   SimulationRouteEnabled:
     Description: Indica si la ruta de simulación académica existe en este stage
     Value: !If [IsAcademicStage, "true", "false"]

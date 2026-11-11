@@ -56,28 +56,29 @@ independientes. Los identificadores CA se conservan literalmente.
 
 **⚠️ CRITICAL**: Ninguna historia de usuario comienza hasta completar esta fase.
 
-- [ ] T013 [P] Define shared Zod schemas in `packages/shared/src/schemas.ts`: `title` 1–120 caracteres, `description` 1–2000 caracteres, `goalAmountCents` entero > 0, `amountCents` entero 100–100000, `currency` exactamente `PEN`, `status` de proyecto `BORRADOR|PUBLICADO`, `status` de donación `PENDIENTE_SIMULACION|CONFIRMADA_SIMULADA|RECHAZADA_SIMULADA` and error envelope `{ code, message, requestId }`
-- [ ] T014 [P] Implement canonical JSON serialization (sorted keys, no insignificant whitespace) and SHA-256 payload hashing in `packages/shared/src/canonical.ts`
-- [ ] T015 [P] Implement backend environment configuration for `STAGE`, table names, Cognito issuer/client and allowed origins in `backend/src/shared/config.ts`
-- [ ] T016 [P] Implement DynamoDB DocumentClient factory and table-name resolution in `backend/src/shared/dynamodb.ts`
-- [ ] T017 [P] Implement uniform HTTP response and error helpers with `{ code, message, requestId }` and no internal details in `backend/src/shared/http.ts`
-- [ ] T018 [P] Implement structured JSON logger with `requestId`, action, result, HTTP status and duration, excluding secrets and personal data, in `backend/src/shared/logger.ts`
-- [ ] T019 Implement idempotency helpers using PK `donorSub#createDonation#idempotencyKey`, `payloadHash` and TTL `expiresAt` of 24 h in `backend/src/shared/idempotency.ts`
-- [ ] T020 Complete audit module write path for `PROJECT_CREATED`, `PROJECT_PUBLISHED`, `DONATION_CREATED`, `DONATION_CONFIRMED`, `DONATION_REJECTED` and `ACCESS_DENIED` in `backend/src/audit/repository.ts`
-- [ ] T021 Implement authz principal extraction from API Gateway authorizer context (`sub`, groups, scopes) with no trust in body/query/headers, and verify `token_use=access` as defense in depth, in `backend/src/authz/principal.ts`
-- [ ] T022 Implement RBAC and ownership guards for GESTOR, DONANTE and AUDITOR in `backend/src/authz/policies.ts`
-- [ ] T023 Define `Projects`, `Donations`, `Idempotency` and `AuditEvents` DynamoDB tables in `infra/template.yaml`: Projects PK `projectId` + GSI `status-createdAt`; Donations PK `donationId` + GSI `donorSub-createdAt`; Idempotency PK `pk` + TTL `expiresAt`; AuditEvents PK `eventType` + SK `timestamp#eventId`; on-demand billing
-- [ ] T024 Define Cognito User Pool, groups `DONANTE|GESTOR|AUDITOR`, app client with Authorization Code + PKCE, access token validity 5–15 min and TOTP MFA for GESTOR/AUDITOR in `infra/template.yaml`
-- [ ] T025 Define API Gateway HTTP API, Cognito JWT authorizer, scopes `api/projects.write`, `api/donations.write`, `api/donations.read` and `api/audit.read`, with `authorizationScopes` required on every protected route so ID tokens are rejected, in `infra/template.yaml`
-- [ ] T026 Define base Lambda functions and least-privilege IAM roles for public project reads and protected handlers in `infra/template.yaml`
-- [ ] T027 Add stage-conditional academic-only simulation route so the path does not exist outside `Stage=academic` in `infra/template.yaml`
-- [ ] T028 Create backend test harness for authorizer context, DynamoDB tables and fixtures in `backend/test/helpers/setup.ts`
-- [ ] T029 Implement reproducible seed data with at least one PUBLICADO project, one BORRADOR project and donations in PENDIENTE_SIMULACION, CONFIRMADA_SIMULADA and RECHAZADA_SIMULADA in `scripts/seed.ts`
-- [ ] T030 Implement frontend API client with bearer token injection and QueryClient provider in `frontend/src/services/apiClient.ts` and `frontend/src/services/queryClient.ts`
-- [ ] T031 Implement OIDC auth provider with Authorization Code + PKCE, in-memory tokens (`userStore: new WebStorageStateStore({ store: new InMemoryWebStorage() })`, never `localStorage`/`sessionStorage`) and revoke-on-logout in `frontend/src/auth/AuthProvider.tsx`
-- [ ] T032 Implement app shell, public/protected routes and UX-only protected route guard in `frontend/src/App.tsx` and `frontend/src/components/Layout.tsx`
-- [ ] T033 [P] Implement integer-cents to PEN display formatting without float arithmetic in `frontend/src/services/money.ts`
-- [ ] T065 [P] Create test fixtures for published, draft and donation states in `backend/test/helpers/fixtures.ts`
+- [X] T013 [P] Define shared Zod schemas in `packages/shared/src/schemas.ts`: `title` 1–120 caracteres, `description` 1–2000 caracteres, `goalAmountCents` entero > 0, `amountCents` entero 100–100000, `currency` exactamente `PEN`, `status` de proyecto `BORRADOR|PUBLICADO`, `status` de donación `PENDIENTE_SIMULACION|CONFIRMADA_SIMULADA|RECHAZADA_SIMULADA` and error envelope `{ code, message, requestId }`
+- [X] T014 [P] Implement canonical JSON serialization (sorted keys, no insignificant whitespace) and SHA-256 payload hashing in `packages/shared/src/canonical.ts`
+- [X] T015 [P] Implement backend environment configuration for `STAGE`, table names, Cognito issuer/client and allowed origins in `backend/src/shared/config.ts`
+- [X] T016 [P] Implement DynamoDB DocumentClient factory and table-name resolution in `backend/src/shared/dynamodb.ts`
+- [X] T017 [P] Implement uniform HTTP response and error helpers with `{ code, message, requestId }` and no internal details in `backend/src/shared/http.ts`
+- [X] T018 [P] Implement structured JSON logger with `requestId`, action, result, HTTP status and duration, excluding secrets and personal data, in `backend/src/shared/logger.ts`
+- [X] T019 Implement idempotency helpers using PK `donorSub#createDonation#idempotencyKey`, `payloadHash` and TTL `expiresAt` of 24 h in `backend/src/shared/idempotency.ts`
+- [X] T020 Complete audit module write path for `PROJECT_CREATED`, `PROJECT_PUBLISHED`, `DONATION_CREATED`, `DONATION_CONFIRMED`, `DONATION_REJECTED` and `ACCESS_DENIED` in `backend/src/audit/repository.ts`
+- [X] T021 Implement authz principal extraction from API Gateway authorizer context (`sub`, groups, scopes) with no trust in body/query/headers, and verify `token_use=access` as defense in depth, in `backend/src/authz/principal.ts`
+- [X] T022 Implement RBAC and ownership guards for GESTOR, DONANTE and AUDITOR in `backend/src/authz/policies.ts`
+- [X] T023 Define `Projects`, `Donations`, `Idempotency` and `AuditEvents` DynamoDB tables in `infra/template.yaml`: Projects PK `projectId` + GSI `status-createdAt`; Donations PK `donationId` + GSI `donorSub-createdAt`; Idempotency PK `pk` + TTL `expiresAt`; AuditEvents PK `eventType` + SK `timestamp#eventId`; on-demand billing
+- [X] T024 Define Cognito User Pool, groups `DONANTE|GESTOR|AUDITOR`, app client with Authorization Code + PKCE, access token validity 5–15 min and TOTP MFA for GESTOR/AUDITOR in `infra/template.yaml`
+- [X] T025 Define API Gateway HTTP API, Cognito JWT authorizer, scopes `api/projects.write`, `api/donations.write`, `api/donations.read` and `api/audit.read`, with `authorizationScopes` required on every protected route so ID tokens are rejected, in `infra/template.yaml`
+- [X] T026 Define base Lambda functions and least-privilege IAM roles for public project reads and protected handlers in `infra/template.yaml`
+- [X] T027 Add stage-conditional academic-only simulation route so the path does not exist outside `Stage=academic` in `infra/template.yaml`
+- [X] T028 Create backend test harness for authorizer context, DynamoDB tables and fixtures in `backend/test/helpers/setup.ts`
+- [X] T029 Implement reproducible seed data with at least one PUBLICADO project, one BORRADOR project and donations in PENDIENTE_SIMULACION, CONFIRMADA_SIMULADA and RECHAZADA_SIMULADA in `scripts/seed.ts`
+- [X] T030 Implement frontend API client with bearer token injection and QueryClient provider in `frontend/src/services/apiClient.ts` and `frontend/src/services/queryClient.ts`
+- [X] T031 Implement OIDC auth provider with Authorization Code + PKCE, in-memory tokens (`userStore: new WebStorageStateStore({ store: new InMemoryWebStorage() })`, never `localStorage`/`sessionStorage`) and revoke-on-logout in `frontend/src/auth/AuthProvider.tsx`
+- [X] T032 Implement app shell, public/protected routes and UX-only protected route guard in `frontend/src/App.tsx` and `frontend/src/components/Layout.tsx`
+- [X] T033 [P] Implement integer-cents to PEN display formatting without float arithmetic in `frontend/src/services/money.ts`
+- [X] T065 [P] Create test fixtures for published, draft and donation states in `backend/test/helpers/fixtures.ts`
+- [X] T117 [P] Create minimal `frontend/index.html` and `frontend/src/main.tsx` (React root rendering the app shell, no Bootstrap/Next.js) so that `npm run build` succeeds
 
 **Checkpoint**: Foundation ready — las historias pueden comenzar.
 

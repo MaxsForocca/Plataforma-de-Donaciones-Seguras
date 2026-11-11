@@ -2,18 +2,61 @@
   "projects": [
     {
       "projectId": "00000000-0000-4000-8000-000000000001",
-      "title": "Biblioteca comunitaria (proyecto de ejemplo)",
-      "description": "Proyecto ficticio PUBLICADO para pruebas y demo del catálogo.",
+      "title": "Biblioteca comunitaria (ejemplo)",
+      "description": "Proyecto ficticio PUBLICADO con donaciones en varios estados, para probar el catálogo y los indicadores.",
       "goalAmountCents": 500000,
       "status": "PUBLICADO"
     },
     {
       "projectId": "00000000-0000-4000-8000-000000000002",
-      "title": "Huerto escolar (proyecto de ejemplo)",
-      "description": "Proyecto ficticio en BORRADOR; no debe aparecer en el catálogo público.",
+      "title": "Comedor solidario (ejemplo)",
+      "description": "Proyecto ficticio PUBLICADO sin donaciones confirmadas.",
+      "goalAmountCents": 800000,
+      "status": "PUBLICADO"
+    },
+    {
+      "projectId": "00000000-0000-4000-8000-000000000003",
+      "title": "Huerto escolar (ejemplo)",
+      "description": "Proyecto ficticio en BORRADOR; no debe aparecer en el catálogo ni aceptar donaciones.",
       "goalAmountCents": 250000,
       "status": "BORRADOR"
     }
   ],
-  "donations": []
+  "donations": [
+    {
+      "donationId": "00000000-0000-4000-8000-0000000000d1",
+      "projectId": "00000000-0000-4000-8000-000000000001",
+      "donorSub": "seed-donor-a",
+      "amountCents": 2500,
+      "status": "PENDIENTE_SIMULACION"
+    },
+    {
+      "donationId": "00000000-0000-4000-8000-0000000000d2",
+      "projectId": "00000000-0000-4000-8000-000000000001",
+      "donorSub": "seed-donor-a",
+      "amountCents": 10000,
+      "status": "CONFIRMADA_SIMULADA"
+    },
+    {
+      "donationId": "00000000-0000-4000-8000-0000000000d3",
+      "projectId": "00000000-0000-4000-8000-000000000001",
+      "donorSub": "seed-donor-b",
+      "amountCents": 15000,
+      "status": "CONFIRMADA_SIMULADA"
+    },
+    {
+      "donationId": "00000000-0000-4000-8000-0000000000d4",
+      "projectId": "00000000-0000-4000-8000-000000000001",
+      "donorSub": "seed-donor-a",
+      "amountCents": 5000,
+      "status": "RECHAZADA_SIMULADA"
+    },
+    {
+      "donationId": "00000000-0000-4000-8000-0000000000d5",
+      "projectId": "00000000-0000-4000-8000-000000000002",
+      "donorSub": "seed-donor-b",
+      "amountCents": 1000,
+      "status": "PENDIENTE_SIMULACION"
+    }
+  ]
 }

@@ -1,3 +1,4 @@
 // Punto de entrada de @donaciones/shared.
-// T013 (schemas.ts) y T014 (canonical.ts) añaden aquí sus reexportaciones.
-export {};
+// `canonical` usa node:crypto y no se reexporta aquí para no arrastrarlo al bundle de la SPA:
+// el backend lo importa explícitamente desde "@donaciones/shared/canonical".
+export * from "./schemas";

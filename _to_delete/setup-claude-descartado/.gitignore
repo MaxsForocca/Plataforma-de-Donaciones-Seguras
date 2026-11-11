@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+.aws-sam/
+*.tsbuildinfo
+*.log
+
+# Secretos y configuración local: nunca se versionan
+.env
+.env.*
+!.env.example
+samconfig.local.toml
+
+.DS_Store
+Thumbs.db
